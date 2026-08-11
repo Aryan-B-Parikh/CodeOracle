@@ -22,3 +22,6 @@ testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-q"
 norecursedirs = ["fixtures", "venv", ".venv"]
+markers = [
+    "network: tests that require network access (auto-skip when unreachable)",
+]

@@ -135,3 +135,12 @@ cd frontend && npm run test
 - **pgvector index error** → confirm the `vector` extension exists before running migrations.
 - **Celery tasks stuck** → confirm Redis is reachable and worker is running (`celery inspect ping`).
 - **Sandbox hangs** → check `SANDBOX_TIMEOUT_SECONDS` and Docker resource limits.
+- **Port 5432 already in use** → a local Postgres service may be squatting on it. Run the dev container on another port and point `DATABASE_URL` at it:
+  ```bash
+  docker run -d --name codeoracle-pg -p 5433:5432 \
+    -e POSTGRES_PASSWORD=codeoracle -e POSTGRES_DB=codeoracle \
+    pgvector/pgvector:pg15
+  # DATABASE_URL=postgresql+psycopg://codeoracle:codeoracle@localhost:5433/codeoracle
+  # then create the role:  docker exec codeoracle-pg psql -U postgres \
+  #   -c "CREATE ROLE codeoracle LOGIN PASSWORD 'codeoracle';"
+  ```

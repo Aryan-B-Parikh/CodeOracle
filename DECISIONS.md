@@ -31,6 +31,17 @@
 - **Verified:** python fixture 12.1% line / java fixture 21.7% line (committed tests only touch `tax.py`/`TaxCalculatorTest`, so low baseline is expected); busy-loop killed at timeout (exit 124, ~15s); memory hog OOM-killed (exit 137, ~2s); network resolution fails (`--network none`).
 - **Host tests `backend/tests/test_sandbox.py`** cover the hardening flags (pure) and the two fixtures + both escapes (integration, auto-skip when the image is absent).
 
+## 2026-08-11 — T-03 repository scanner decisions
+
+- **DB layer added** (`app/db/`): SQLAlchemy 2.x `session.py` + `repositories`/`files` models; Alembic setup (`alembic.ini`, `migrations/`) with migration `0001_initial`.
+- **JSONB with SQLite variant** (`JSONB().with_variant(JSON(), "sqlite")`) on `languages`/`warnings`: production PG gets JSONB (ADR-003), tests/CI get portable JSON. Tests run on in-memory SQLite (StaticPool) so CI needs no Postgres; production schema is applied via `alembic upgrade head`.
+- **camelCase JSON** enforced with pydantic `alias_generator=to_camel` + `populate_by_name` — matches the `docs/03` API contract and `docs/api-examples`; internal fields stay snake_case.
+- **Scanner is pure** (`app/analyzers/scanner.py`): walks files, classifies by extension, counts LOC + sha256, flags unsupported as `other` with a warning — never a failure. Ingestion is synchronous in the endpoints for now; the analysis pipeline (parsing etc.) will run via Celery in later tasks (T-06).
+- **Zip hardening:** path-traversal rejection, 100MB upload cap, 200MB/20k-file extract caps, single-top-dir collapse (repo root detection).
+- **Import hardening:** URL scheme whitelist (`http/https/ssh`, `git@`), `git clone --depth 1` with 300s timeout; the clone step is a monkeypatchable function for hermetic tests.
+- **Local PG gotcha:** this machine has a Postgres service squatting on host port 5432 (two listeners). The dev container runs on **5433**; docs/05 gained a troubleshooting note. Role `codeoracle` created with password `codeoracle`.
+- **Verified:** `alembic upgrade head` applied to real PostgreSQL; upload of the `python_basic` fixture returns camelCase JSON, 8 files / 226 LOC, `languages={"python": true}`; rows confirmed via psql. All 15 tests pass, including a network-gated real GitHub clone (`octocat/Hello-World`).
+
 ## Template for new entries
 
 ```
