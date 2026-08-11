@@ -100,3 +100,51 @@ def test_analyze_python_basic_persists_graph(client: TestClient) -> None:
             .one()
         )
         assert invoice_error.type == "class"
+
+
+def test_analyze_java_basic_persists_graph(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/repositories/upload",
+        files={"file": ("java_basic.zip", _fixture_zip("java_basic"), "application/zip")},
+    )
+    assert response.status_code == 201
+    repository_id = uuid.UUID(response.json()["data"]["id"])
+
+    with SessionLocal() as db:
+        repository = db.get(Repository, repository_id)
+        assert repository is not None
+
+        result = analyze_repository(db, repository)
+        assert result["entities"] == 27
+
+        db.refresh(repository)
+        assert repository.entity_count == 27
+
+        invoice_file = (
+            db.query(File)
+            .filter(
+                File.repository_id == repository_id,
+                File.path.endswith("Invoice.java"),
+            )
+            .one()
+        )
+        total = (
+            db.query(Entity)
+            .filter(
+                Entity.repository_id == repository_id,
+                Entity.file_id == invoice_file.id,
+                Entity.name == "total",
+            )
+            .one()
+        )
+        resolved_call = next(
+            c
+            for c in total.calls_made
+            if c.callee_name == "discount" and c.caller_id == total.id
+        )
+        assert resolved_call.callee_id is not None
+        assert resolved_call.external is False
+
+        import_modules = {i.module for i in invoice_file.imports}
+        assert import_modules == {"java.util.List", "java.util.Map"}
+        assert all(i.is_external for i in invoice_file.imports)

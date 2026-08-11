@@ -7,7 +7,9 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from app.analyzers.java_parser import parse_java
 from app.analyzers.python_parser import ParsedFile, parse_python
+from app.analyzers.types import ImportRef
 from app.config import get_settings
 from app.db.models.call import Call
 from app.db.models.entity import Entity
@@ -26,18 +28,28 @@ def repository_root(repository: Repository) -> Path:
     return workdir / "repo"
 
 
-def _local_modules(files: list[File]) -> set[str]:
-    return {Path(f.path).stem for f in files}
+def _local_names(files: list[File], language: str) -> set[str]:
+    return {Path(f.path).stem for f in files if f.language == language}
+
+
+def _is_external_import(ref: ImportRef, language: str, local_names: set[str]) -> bool:
+    if language == "java":
+        return ref.module.split(".")[-1] not in local_names
+    return ref.module not in local_names and not ref.module.startswith(".")
 
 
 def _store_imports(
-    db: Session, file_row: File, parsed: ParsedFile, local_modules: set[str]
+    db: Session,
+    file_row: File,
+    parsed: ParsedFile,
+    language: str,
+    local_names: set[str],
 ) -> None:
     refs = list(parsed.imports)
     for entity in parsed.entities:
         refs.extend(entity.imports)
     for ref in refs:
-        is_external = ref.module not in local_modules and not ref.module.startswith(".")
+        is_external = _is_external_import(ref, language, local_names)
         db.add(
             Import(
                 file_id=file_row.id,
@@ -79,9 +91,10 @@ def _store_file(
     repository: Repository,
     file_row: File,
     parsed: ParsedFile,
-    local_modules: set[str],
+    language: str,
+    local_names: set[str],
 ) -> None:
-    _store_imports(db, file_row, parsed, local_modules)
+    _store_imports(db, file_row, parsed, language, local_names)
 
     entity_ids: dict[tuple[str, str | None, str], uuid.UUID] = {}
     for entity in parsed.entities:
@@ -92,7 +105,7 @@ def _store_file(
             type=entity.kind,
             parent_id=None,
             signature=entity.signature,
-            language="python",
+            language=language,
             line_start=entity.line_start,
             line_end=entity.line_end,
             complexity=entity.complexity,
@@ -128,26 +141,32 @@ def _store_file(
     _store_calls(db, repository, None, parsed.module_calls, name_to_id)
 
 
-def analyze_repository(db: Session, repository: Repository) -> dict[str, int]:
+def analyze_repository(db: Session, repository: Repository) -> dict[str, object]:
     root = repository_root(repository)
-    files = [f for f in repository.files if f.language == "python"]
-    local_modules = _local_modules(files)
-
     entity_count = 0
     analyzed_files = 0
-    for file_row in files:
-        path = root / file_row.path
-        if not path.is_file():
+    counts: dict[str, int] = {}
+
+    for language, parser in (("python", parse_python), ("java", parse_java)):
+        files = [f for f in repository.files if f.language == language]
+        if not files:
             continue
-        try:
-            source = path.read_text(encoding="utf-8", errors="replace")
-            parsed = parse_python(source, file_row.path)
-        except SyntaxError:
-            continue
-        _store_file(db, repository, file_row, parsed, local_modules)
-        entity_count += len(parsed.entities)
-        analyzed_files += 1
+        local_names = _local_names(files, language)
+        for file_row in files:
+            path = root / file_row.path
+            if not path.is_file():
+                continue
+            try:
+                source = path.read_text(encoding="utf-8", errors="replace")
+                parsed = parser(source, file_row.path)
+            except SyntaxError:
+                continue
+            _store_file(db, repository, file_row, parsed, language, local_names)
+            entity_count += len(parsed.entities)
+            analyzed_files += 1
+        counts[language] = len(files)
 
     repository.entity_count = entity_count
     db.commit()
-    return {"entities": entity_count, "files_analyzed": analyzed_files}
+    return {"entities": entity_count, "files_analyzed": analyzed_files, "languages": counts}
+

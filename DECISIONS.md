@@ -51,6 +51,15 @@
 - **Analysis service** (`app/services/analysis.py`) persists imports, entities (with class→method `parent_id`), and calls (with `external` flag), updates `repository.entity_count`. Runs synchronously for now; Celery orchestration lands in T-07.
 - **Verified:** 25/25 tests (golden extraction + manual CCN counts on the 3 fixture files); migration `0002_entities` applied to real PostgreSQL; e2e on PG = 23 entities / 8 files with correct call edges (`apply_discount`/`calculate_subtotal` resolved, `customer.load_customer`/`tax.calculate_tax` external).
 
+## 2026-08-11 — T-05 Java parser decisions
+
+- **Parsing via tree-sitter-java, not JavaParser (deviation from stack docs, logged).** JavaParser needs a JVM on the backend host; tree-sitter is pure-Python and is already part of the stack. `app/analyzers/java_parser.py` returns the identical `ParsedFile`/`ParsedEntity` types as the Python parser, so one persistence service handles both.
+- **Shared types module** `app/analyzers/types.py`; `python_parser` re-exports them (test compat).
+- **Java complexity** = 1 + decision points (if/while/for/enhanced-for/do/catch/ternary/switch + case, plus each `&&`/`||`). Class complexity = **max of its methods** (Python classes use radon's own formula — documented cross-language asymmetry). Verified: charge=8, discount=3, parseAmount=3, legacyCalc=2, isVip=2.
+- **Grammar quirk:** `modifiers` is a child node, not a field (`child_by_field_name("modifiers")` → None) in this tree-sitter-java version — `_is_public` scans children. Constructors are extracted as methods (parent = class, e.g. private ctor → `is_public=False`).
+- **Java imports external** = last dotted segment not in the repo's local class names; `globals_used` for Java = referenced class fields (instance + static).
+- **Verified:** 32/32 tests (golden extraction + manual CCN); e2e on real PostgreSQL = 27 entities / 6 files (incl. committed `TaxCalculatorTest`), `discount` call edge resolved, `java.util.*` imports external.
+
 ## Template for new entries
 
 ```
