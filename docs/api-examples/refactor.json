@@ -1,0 +1,42 @@
+{
+  "data": {
+    "id": "d3b2c1a4-0e9d-4b2c-9d3e-1f2a3b4c5d6e",
+    "entity": { "name": "process_payment", "file": "payment.py", "lineStart": 30, "lineEnd": 58 },
+    "original": "def process_payment(user_id, amount):\n    ...",
+    "proposed": "def process_payment(user, amount, currency='INR'):\n    ...",
+    "rationale": [
+      "Improved naming",
+      "Removed magic numbers",
+      "Reduced ambiguity",
+      "Improved readability"
+    ],
+    "behavioralDifferences": [
+      "Default currency added; callers that pass two positional args remain compatible."
+    ],
+    "breakingChanges": {
+      "detected": true,
+      "changes": [
+        {
+          "entity": "process_payment",
+          "impact": "HIGH",
+          "reason": "Existing callers provide only 2 arguments; new signature requires a user object.",
+          "affectedCallers": [
+            "checkout.py:83",
+            "subscription.py:41",
+            "api/payment.py:102"
+          ]
+        }
+      ]
+    },
+    "safetyScore": {
+      "total": 91,
+      "apiCompatibility": 96,
+      "testCompatibility": 89,
+      "dependencyImpact": 94,
+      "behavioralRisk": 86,
+      "riskLevel": "LOW"
+    },
+    "createdAt": "2026-08-11T13:07:00Z"
+  },
+  "error": null
+}

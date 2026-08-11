@@ -1,0 +1,20 @@
+{
+  "data": {
+    "entity": {
+      "name": "calculate_tax",
+      "file": "tax.py",
+      "lineStart": 17,
+      "lineEnd": 22
+    },
+    "callers": [
+      { "caller": "calculate_invoice", "file": "billing.py", "lineStart": 24, "lineEnd": 42, "callLine": 35 },
+      { "caller": "recompute_total", "file": "reports.py", "lineStart": 12, "lineEnd": 19, "callLine": 16 }
+    ],
+    "callees": [
+      { "callee": "get_tax_rate", "file": "tax.py", "lineStart": 12, "lineEnd": 16 }
+    ],
+    "impact": "HIGH",
+    "impactReason": "2 callers across 2 modules depend on this function's behavior and error semantics."
+  },
+  "error": null
+}

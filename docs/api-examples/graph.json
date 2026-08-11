@@ -1,0 +1,24 @@
+{
+  "data": {
+    "nodes": [
+      { "id": "billing.py", "label": "billing.py", "type": "module", "complexity": 18 },
+      { "id": "billing.py::calculate_invoice", "label": "calculate_invoice", "type": "function", "complexity": 18, "file": "billing.py", "lineStart": 24, "lineEnd": 42 },
+      { "id": "tax.py", "label": "tax.py", "type": "module" },
+      { "id": "tax.py::calculate_tax", "label": "calculate_tax", "type": "function", "complexity": 3, "file": "tax.py", "lineStart": 17, "lineEnd": 22 },
+      { "id": "database.py", "label": "database.py", "type": "module" },
+      { "id": "database.py::insert", "label": "insert", "type": "function", "complexity": 1, "file": "database.py", "lineStart": 31, "lineEnd": 33 }
+    ],
+    "edges": [
+      { "source": "billing.py::calculate_invoice", "target": "tax.py::calculate_tax" },
+      { "source": "billing.py::calculate_invoice", "target": "database.py::insert" },
+      { "source": "billing.py", "target": "billing.py::calculate_invoice" }
+    ],
+    "meta": {
+      "circularDependencies": [
+        { "cycle": ["billing.py", "database.py"] }
+      ],
+      "highRiskNodeIds": ["billing.py::calculate_invoice"]
+    }
+  },
+  "error": null
+}

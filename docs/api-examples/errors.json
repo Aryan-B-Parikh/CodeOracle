@@ -1,0 +1,39 @@
+{
+  "validationError": {
+    "data": null,
+    "error": {
+      "code": "VALIDATION_ERROR",
+      "message": "repository_id must be a valid UUID",
+      "details": { "field": "repository_id", "value": "not-a-uuid" }
+    }
+  },
+  "notFound": {
+    "data": null,
+    "error": {
+      "code": "NOT_FOUND",
+      "message": "repository 9f4f3b2e-7c1a-4d5e-8b0f-2a1c3d4e5f6a not found"
+    }
+  },
+  "unsupportedLanguage": {
+    "data": null,
+    "error": {
+      "code": "UNSUPPORTED_LANGUAGE",
+      "message": "no supported languages detected (Python/Java required)"
+    }
+  },
+  "sandboxFailed": {
+    "data": null,
+    "error": {
+      "code": "SANDBOX_FAILED",
+      "message": "test execution failed inside the sandbox",
+      "details": { "returnCode": 124, "reason": "sandbox timeout exceeded" }
+    }
+  },
+  "internal": {
+    "data": null,
+    "error": {
+      "code": "INTERNAL",
+      "message": "an unexpected error occurred"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "data": {
+    "entity": {
+      "name": "calculate_tax",
+      "type": "function",
+      "file": "tax.py",
+      "lineStart": 17,
+      "lineEnd": 22
+    },
+    "explanation": {
+      "purpose": "Calculates sales tax for an amount based on the region's tax rate.",
+      "inputs": "amount (float), region (str), exempt (bool, default false)",
+      "outputs": "float — rounded to 2 decimals",
+      "sideEffects": "None",
+      "dependencies": "TAX_RATES map; get_tax_rate raises UnknownRegionError",
+      "controlFlow": "If exempt, returns 0.0 immediately; otherwise looks up the region rate and applies it.",
+      "errorHandling": "Unknown regions raise UnknownRegionError via get_tax_rate.",
+      "businessRules": "Exempt purchases incur no tax; rates are US 8%, UK 20%, IN 5%.",
+      "complexity": 3,
+      "risks": "Relying on a mutable module-level rate table; unknown-region path is an error case."
+    },
+    "evidence": [
+      {
+        "claim": "Exempt purchases incur no tax.",
+        "file": "tax.py",
+        "lineStart": 18,
+        "lineEnd": 19,
+        "code": "if exempt:\n    return 0.0"
+      },
+      {
+        "claim": "Rates are US 8%, UK 20%, IN 5%.",
+        "file": "tax.py",
+        "lineStart": 6,
+        "lineEnd": 10,
+        "code": "TAX_RATES = {\n    \"US\": 0.08,\n    \"UK\": 0.20,\n    \"IN\": 0.05,\n}"
+      }
+    ]
+  },
+  "error": null
+}

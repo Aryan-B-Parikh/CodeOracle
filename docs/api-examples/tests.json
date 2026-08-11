@@ -1,0 +1,25 @@
+{
+  "data": {
+    "testRunId": "c2a1b3d4-9e8f-4a1b-8c2d-0f1e2d3c4b5a",
+    "status": "passed",
+    "iteration": 3,
+    "testsGenerated": 37,
+    "testsPassed": 35,
+    "testsFailed": 2,
+    "lineCoverage": 74.6,
+    "branchCoverage": 68.2,
+    "target": 60,
+    "targetReached": true,
+    "statusLabel": "PASSED",
+    "uncoveredLines": [
+      { "file": "billing.py", "line": 82, "branch": true },
+      { "file": "billing.py", "line": 91, "branch": false },
+      { "file": "billing.py", "line": 94, "branch": true }
+    ],
+    "failedTests": [
+      { "name": "test_apply_discount_vip", "targetEntity": "apply_discount", "message": "expected 5.0, got 0.0" }
+    ],
+    "createdAt": "2026-08-11T13:05:12Z"
+  },
+  "error": null
+}
