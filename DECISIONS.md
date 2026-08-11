@@ -11,6 +11,14 @@
 - **4-tab UI** maps 1:1 to judging criteria: Explanation / Dependency Graph / Tests / Refactor.
 - **Demo flow:** 5–8K LOC upload → pipeline → architecture → explanation → tests → 73% coverage → modernization → breaking change detected → safety 89/100.
 
+## 2026-08-11 — T-01 scaffold decisions
+
+- **pytest excludes golden fixtures.** Running `pytest backend/tests` collected the fixture repos under `backend/tests/fixtures/` and `python_basic/app.py` shadowed the `app` package (fixture dir got prepended to `sys.path`, so `app.main` failed as "not a package"). Fixed with `norecursedirs = ["fixtures", "venv", ".venv"]` in `backend/pyproject.toml`. Fixture test files are golden inputs for the product, never part of our own suite.
+- **mypy config:** strict-style (disallow untyped defs, warn-return-any, etc.) rather than `strict = true` to avoid third-party stub friction on FastAPI/pydantic; `exclude = ["tests"]`.
+- **Frontend pins:** React 18 + Vite 5 + TS 5 + ESLint 8 (classic `.eslintrc.cjs`) + Vitest 2. ESLint 8 classic config over ESLint 9 flat config for now — revisit when adding plugins. Prettier `singleQuote`/no `semi` per docs/04. No state/graph/editor libs yet (added in their own tasks).
+- **Local dev on Python 3.14 + pip venv** (`backend/.venv`), while CI and docs target Python 3.11. FastAPI TestClient emits a StarletteDeprecationWarning (httpx) — harmless, tracked.
+- **CI:** GitHub Actions (`.github/workflows/ci.yml`), two jobs (backend ruff+mypy+pytest, frontend eslint+tsc+vitest), runs on push to `main` and PRs. Requires `git init` + GitHub remote to actually fire.
+
 ## Template for new entries
 
 ```

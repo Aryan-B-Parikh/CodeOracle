@@ -1,0 +1,15 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+sqlalchemy>=2.0
+psycopg[binary]>=3.2
+alembic>=1.13
+celery>=5.4
+redis>=5.0
+pydantic>=2.9
+pydantic-settings>=2.5
+networkx>=3.3
+radon>=6.0
+tree-sitter>=0.23
+tree-sitter-python>=0.23
+tree-sitter-java>=0.23
+python-multipart>=0.0.12
