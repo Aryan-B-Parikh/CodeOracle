@@ -19,6 +19,18 @@
 - **Local dev on Python 3.14 + pip venv** (`backend/.venv`), while CI and docs target Python 3.11. FastAPI TestClient emits a StarletteDeprecationWarning (httpx) — harmless, tracked.
 - **CI:** GitHub Actions (`.github/workflows/ci.yml`), two jobs (backend ruff+mypy+pytest, frontend eslint+tsc+vitest), runs on push to `main` and PRs. Requires `git init` + GitHub remote to actually fire.
 
+## 2026-08-11 — T-02 sandbox decisions
+
+- **Base image `python:3.11-slim-bookworm`** (not `:slim`): the current `python:3.11-slim` is Debian trixie, which has no `openjdk-17` package. Bookworm ships JDK 17; fixtures target `maven.compiler.source/target 17`.
+- **`-Dproject.build.directory` does NOT redirect compiler output** (model-interpolation gotcha — javac still wrote to read-only `/sandbox/target`). Java runs now build from a writable copy: `cp -r /sandbox /home/codeoracle/project && mvn ...` inside the scratch volume.
+- **Maven is offline at runtime** (`-o`); the local repo is pre-populated at image build by running `mvn verify` on `offline-java/pom.xml` (JUnit 4, surefire/compiler plugins, JaCoCo agent + report). Runtime requires `--network none`, so no downloads are possible.
+- **pytest-cov** added to the image. Coverage data file must land in writable scratch (`.coverage` in cwd): pytest runs from `/home/codeoracle` with absolute `/sandbox/...` paths.
+- **JaCoCo skips the report when there are no tests**; `parse_jacoco.py` then falls back to a zero-coverage JSON instead of erroring.
+- **Writable scratch = anonymous volume at `/home/codeoracle`** (auto-removed with `--rm`, initialized from the image so the Maven repo is present) + small `--tmpfs /tmp:size=64m`. Extra hardening: `--cap-drop ALL`, `--security-opt no-new-privileges`, `--pids-limit 128`, named container + `docker kill` for timeout.
+- **Runner (`backend/sandbox/run.py`) returns canonical coverage JSON** `{lineCoverage, branchCoverage, uncoveredLines}` for both languages; ANSI-tolerant extraction (Maven prints a color reset before the JSON line).
+- **Verified:** python fixture 12.1% line / java fixture 21.7% line (committed tests only touch `tax.py`/`TaxCalculatorTest`, so low baseline is expected); busy-loop killed at timeout (exit 124, ~15s); memory hog OOM-killed (exit 137, ~2s); network resolution fails (`--network none`).
+- **Host tests `backend/tests/test_sandbox.py`** cover the hardening flags (pure) and the two fixtures + both escapes (integration, auto-skip when the image is absent).
+
 ## Template for new entries
 
 ```

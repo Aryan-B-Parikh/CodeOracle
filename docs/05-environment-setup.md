@@ -92,6 +92,17 @@ cd backend/sandbox
 docker build -t codeoracle/sandbox:latest .
 ```
 
+Run the sandbox via `backend/sandbox/run.py` — it stages the repo into a
+read-only scratch copy, enforces every constraint in
+`backend/sandbox/security-policy.md` (no network, CPU/memory limits, hard
+timeout, non-root, read-only base), and returns canonical coverage JSON:
+
+```bash
+cd backend/sandbox
+python run.py --language python --source <repo-dir> [--tests <tests-dir>]
+python run.py --language java --source <maven-project-root>
+```
+
 No uploaded code is ever executed on the backend host or the DB host.
 
 ## Secrets / config handling rules

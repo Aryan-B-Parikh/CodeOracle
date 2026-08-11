@@ -63,6 +63,10 @@ cd frontend && npm run dev
 
 # sandbox image
 cd backend/sandbox && docker build -t codeoracle/sandbox:latest .
+
+# sandbox run (returns canonical coverage JSON: lineCoverage/branchCoverage/uncoveredLines)
+cd backend/sandbox && python run.py --language python --source <repo-dir> [--tests <tests-dir>]
+cd backend/sandbox && python run.py --language java --source <maven-project-root>
 ```
 
 Env vars: `DATABASE_URL`, `REDIS_URL`, `LLM_API_KEY`, `LLM_PROVIDER`, `LLM_MODEL`, `EMBEDDING_MODEL`, `SANDBOX_IMAGE`, `SANDBOX_TIMEOUT_SECONDS`, `UPLOAD_DIR`, `LOG_LEVEL`. See docs/05.
