@@ -21,7 +21,8 @@ jobs:
       - name: Lint (ruff)
         run: ruff check backend/app
       - name: Typecheck (mypy)
-        run: mypy backend/app
+        working-directory: backend
+        run: mypy app
       - name: Tests (pytest)
         run: pytest backend/tests
 
