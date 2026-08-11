@@ -60,6 +60,14 @@
 - **Java imports external** = last dotted segment not in the repo's local class names; `globals_used` for Java = referenced class fields (instance + static).
 - **Verified:** 32/32 tests (golden extraction + manual CCN); e2e on real PostgreSQL = 27 entities / 6 files (incl. committed `TaxCalculatorTest`), `discount` call edge resolved, `java.util.*` imports external.
 
+## 2026-08-11 — T-02 follow-up: explicit resource policy
+
+- **New `backend/sandbox/policy.py`** is the single source of truth for every limit (CPU 1.0, memory 512m/swap 512m, pids 128, /tmp 64m, runtime 300s, **staged source 50MB**, **generated tests 10MB**, **stdout 1MB**, **stderr 1MB**); `run.py`/`stage.py` import it so policy and code can't drift. `security-policy.md` now carries the full table + exit codes (124 timeout / 125 resource / 137 OOM).
+- **Bounded output capture** — replaced `subprocess.run(capture_output=True)` (unbounded host memory risk) with capped reader threads; overflow kills the container and reports `stdout/stderr limit exceeded` (exit 125).
+- **Fail-closed staging limits** — `stage.py` raises `StageLimitError` (exit 125) before `docker run` when the extracted repo or generated tests exceed their caps.
+- **`pytest -s` in the sandbox** — pytest's fd-level capture was swallowing `os.write(1|2, ...)` floods; raw output must reach the Docker pipe for the stdout/stderr limits to be meaningful.
+- **Escape fixtures** `escape/python/stdout_flood` + `stderr_flood`; both killed at the 1MB cap. Verified: 36/36 tests.
+
 ## Template for new entries
 
 ```

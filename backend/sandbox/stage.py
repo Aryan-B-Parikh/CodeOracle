@@ -10,7 +10,33 @@ repository is never touched.
 import shutil
 from pathlib import Path
 
+from policy import MAX_GENERATED_TESTS_BYTES, MAX_STAGED_SOURCE_BYTES
+
 PYTHON_CONFTEST = "import sys\nsys.path.insert(0, '/sandbox/src')\n"
+
+
+class StageLimitError(Exception):
+    pass
+
+
+def _total_bytes(path: Path) -> int:
+    if path.is_file():
+        return path.stat().st_size
+    return sum(p.stat().st_size for p in path.rglob("*") if p.is_file())
+
+
+def _enforce_limits(stage_dir: Path, tests_dir: Path | None) -> None:
+    staged = _total_bytes(stage_dir)
+    if staged > MAX_STAGED_SOURCE_BYTES:
+        raise StageLimitError(
+            f"staged source exceeds limit ({staged} > {MAX_STAGED_SOURCE_BYTES} bytes)"
+        )
+    if tests_dir is not None and tests_dir.is_dir():
+        tests = _total_bytes(tests_dir)
+        if tests > MAX_GENERATED_TESTS_BYTES:
+            raise StageLimitError(
+                f"generated tests exceed limit ({tests} > {MAX_GENERATED_TESTS_BYTES} bytes)"
+            )
 
 
 def _copy_python_source(source_dir: Path, stage: Path) -> None:
@@ -65,3 +91,4 @@ def stage(source_dir: Path, language: str, tests_dir: Path | None, stage_dir: Pa
         _stage_python(source_dir, tests_dir, stage_dir)
     else:
         _stage_java(source_dir, tests_dir, stage_dir)
+    _enforce_limits(stage_dir, tests_dir)

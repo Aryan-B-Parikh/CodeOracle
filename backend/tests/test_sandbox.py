@@ -35,6 +35,31 @@ def test_build_command_enforces_hardening() -> None:
     assert "/sandbox:ro" in command
 
 
+def test_staging_enforces_source_size_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "src"
+    source.mkdir()
+    (source / "big.py").write_text("# " + "x" * 500 + "\n")
+    monkeypatch.setattr(sandbox_stage, "MAX_STAGED_SOURCE_BYTES", 100)
+    with pytest.raises(sandbox_stage.StageLimitError):
+        sandbox_stage.stage(source, "python", None, tmp_path / "stage")
+
+
+def test_staging_enforces_tests_size_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "src"
+    source.mkdir()
+    (source / "app.py").write_text("x = 1\n")
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "test_x.py").write_text("# " + "y" * 500 + "\n")
+    monkeypatch.setattr(sandbox_stage, "MAX_GENERATED_TESTS_BYTES", 100)
+    with pytest.raises(sandbox_stage.StageLimitError):
+        sandbox_stage.stage(source, "python", tests, tmp_path / "stage")
+
+
 def _sandbox_ready() -> bool:
     if shutil.which("docker") is None:
         return False
@@ -89,3 +114,21 @@ def test_memory_limit_kills_hog_fixture(tmp_path: Path) -> None:
     result = sandbox_run.run(tmp_path, "python", timeout=120, image=sandbox_run.IMAGE)
     assert result["timedOut"] is False
     assert result["exitCode"] == 137
+
+
+@pytest.mark.skipif(not _sandbox_ready(), reason="sandbox image not available")
+def test_stdout_limit_kills_flood_fixture(tmp_path: Path) -> None:
+    source = FIXTURES / "escape" / "python" / "stdout_flood"
+    sandbox_stage.stage(source, "python", source / "tests", tmp_path)
+    result = sandbox_run.run(tmp_path, "python", timeout=60, image=sandbox_run.IMAGE)
+    assert result["reason"] == "stdout limit exceeded"
+    assert result["exitCode"] == 125
+
+
+@pytest.mark.skipif(not _sandbox_ready(), reason="sandbox image not available")
+def test_stderr_limit_kills_flood_fixture(tmp_path: Path) -> None:
+    source = FIXTURES / "escape" / "python" / "stderr_flood"
+    sandbox_stage.stage(source, "python", source / "tests", tmp_path)
+    result = sandbox_run.run(tmp_path, "python", timeout=60, image=sandbox_run.IMAGE)
+    assert result["reason"] == "stderr limit exceeded"
+    assert result["exitCode"] == 125
