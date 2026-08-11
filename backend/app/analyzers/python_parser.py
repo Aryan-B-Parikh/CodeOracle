@@ -22,17 +22,29 @@ EntityNode = ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef
 BUILTIN_NAMES = frozenset(dir(builtins))
 
 
-def _iter_entities(tree: ast.Module) -> list[tuple[EntityNode, EntityKind, str | None]]:
-    items: list[tuple[EntityNode, EntityKind, str | None]] = []
-    for node in tree.body:
-        if isinstance(node, ast.ClassDef):
-            items.append((node, "class", None))
-            for stmt in node.body:
-                if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    items.append((stmt, "method", node.name))
-        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            items.append((node, "function", None))
+def _iter_entities(tree: ast.Module) -> list[tuple[EntityNode, EntityKind, str | None, str]]:
+    items: list[tuple[EntityNode, EntityKind, str | None, str]] = []
+
+    def visit_body(
+        body: list[ast.stmt], parent_qualified: str | None, parent_is_class: bool
+    ) -> None:
+        for node in body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                kind: EntityKind = "method" if parent_is_class else "function"
+                qualified = _join_qualified(parent_qualified, node.name)
+                items.append((node, kind, parent_qualified, qualified))
+                visit_body(node.body, qualified, False)
+            elif isinstance(node, ast.ClassDef):
+                qualified = _join_qualified(parent_qualified, node.name)
+                items.append((node, "class", parent_qualified, qualified))
+                visit_body(node.body, qualified, True)
+
+    visit_body(tree.body, None, False)
     return items
+
+
+def _join_qualified(parent: str | None, name: str) -> str:
+    return name if parent is None else f"{parent}.{name}"
 
 
 def _signature(node: EntityNode) -> str:
@@ -92,18 +104,38 @@ def _call_name(func: ast.AST) -> str:
     return ast.unparse(func)
 
 
+def _dynamic_call_kind(func: ast.AST) -> str | None:
+    if isinstance(func, ast.Name) and func.id == "getattr":
+        return "getattr"
+    if isinstance(func, ast.Call):
+        inner = func.func
+        if isinstance(inner, ast.Name) and inner.id == "getattr":
+            return "getattr"
+    if isinstance(func, ast.Subscript):
+        return "subscript"
+    return None
+
+
+def _dynamic_call_name(child: ast.Call) -> str:
+    if isinstance(child.func, (ast.Call, ast.Subscript)):
+        return ast.unparse(child.func)
+    return ast.unparse(child)
+
+
 def _collect_calls(node: EntityNode | ast.Module, local_names: set[str]) -> list[CallRef]:
     result: list[CallRef] = []
 
     def walk(current: ast.AST) -> None:
         for child in _walk_excluding_nested(current):
             if isinstance(child, ast.Call):
-                name = _call_name(child.func)
+                dynamic = _dynamic_call_kind(child.func) is not None
+                name = _dynamic_call_name(child) if dynamic else _call_name(child.func)
                 result.append(
                     CallRef(
                         name=name,
                         line=child.lineno,
-                        resolved=_is_local_call(name, local_names),
+                        resolved=(not dynamic) and _is_local_call(name, local_names),
+                        dynamic=dynamic,
                     )
                 )
             walk(child)
@@ -156,10 +188,10 @@ def parse_python(source: str, path: str) -> ParsedFile:
     tree = ast.parse(source)
     complexity_map = _complexity_map(source)
     items = _iter_entities(tree)
-    local_names = {node.name for node, _, _ in items}
+    local_names = {node.name for node, _, _, _ in items}
 
     entities: list[ParsedEntity] = []
-    for node, kind, parent in items:
+    for node, kind, parent, qualified in items:
         arguments = (
             _arguments(node)
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
@@ -171,17 +203,21 @@ def parse_python(source: str, path: str) -> ParsedFile:
             and node.returns is not None
             else None
         )
+        complexity = complexity_map.get((parent or "", node.name))
+        if complexity is None:
+            complexity = complexity_map.get(("", node.name), 1)
         entities.append(
             ParsedEntity(
                 name=node.name,
                 kind=kind,
                 parent=parent,
+                qualified_name=qualified,
                 signature=_signature(node),
                 line_start=node.lineno,
                 line_end=node.end_lineno or node.lineno,
                 is_public=not node.name.startswith("_"),
                 docstring=ast.get_docstring(node),
-                complexity=complexity_map.get((parent or "", node.name), 1),
+                complexity=complexity,
                 arguments=arguments,
                 return_type=return_type,
                 decorators=[ast.unparse(dec) for dec in node.decorator_list],

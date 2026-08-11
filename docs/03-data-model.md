@@ -57,16 +57,16 @@ Analysis  1───N Embedding (entity_id → chunk)
 | id | UUID PK | |
 | repository_id | FK | |
 | file_id | FK | |
-| name | TEXT NOT NULL | |
+| name | TEXT NOT NULL | simple name |
 | type | TEXT | `function` \| `method` \| `class` |
-| parent_id | FK NULL | enclosing class (methods) |
+| parent_id | FK NULL | enclosing entity (method→class, nested class/function→owner) |
 | signature | TEXT | raw signature |
 | language | TEXT | |
 | line_start / line_end | INTEGER | citeable evidence range |
 | complexity | INTEGER | Radon CCN / cyclomatic |
 | is_public | BOOLEAN | |
 | docstring | TEXT NULL | existing docs |
-| metadata | JSONB | args, return type, decorators, globals touched |
+| metadata | JSONB | args, return type, decorators, globals touched, `qualified_name` (e.g. `Outer.Inner.run`) |
 
 Indexes: `(repository_id, name)`, `(file_id)`.
 
@@ -79,6 +79,7 @@ Indexes: `(repository_id, name)`, `(file_id)`.
 | callee_id | FK → entities | |
 | call_line | INTEGER | evidence |
 | external | BOOLEAN | callee not in repo (stdlib/third-party) |
+| dynamic | BOOLEAN | statically unresolvable dispatch — `getattr(x, n)()`, `obj[k]()` — NOT a definite dependency |
 
 ### `imports`
 | column | type | notes |

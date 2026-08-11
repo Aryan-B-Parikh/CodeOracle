@@ -148,3 +148,40 @@ def test_analyze_java_basic_persists_graph(client: TestClient) -> None:
         import_modules = {i.module for i in invoice_file.imports}
         assert import_modules == {"java.util.List", "java.util.Map"}
         assert all(i.is_external for i in invoice_file.imports)
+
+
+def test_analyze_nested_entities_and_dynamic_calls(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/repositories/upload",
+        files={"file": ("python_nested.zip", _fixture_zip("python_nested"), "application/zip")},
+    )
+    assert response.status_code == 201
+    repository_id = uuid.UUID(response.json()["data"]["id"])
+
+    with SessionLocal() as db:
+        repository = db.get(Repository, repository_id)
+        assert repository is not None
+        analyze_repository(db, repository)
+
+        by_qualified: dict[str, Entity] = {}
+        for entity in db.query(Entity).filter(Entity.repository_id == repository_id):
+            by_qualified[entity.metadata_json["qualified_name"]] = entity
+
+        inner = by_qualified["outer.inner"]
+        assert inner.type == "function"
+        assert inner.parent_id == by_qualified["outer"].id
+
+        nested_class = by_qualified["Wrapper.Inner"]
+        assert nested_class.type == "class"
+        assert nested_class.parent_id == by_qualified["Wrapper"].id
+
+        run = by_qualified["Wrapper.Inner.run"]
+        assert run.parent_id == nested_class.id
+
+        dynamic_calls = [
+            c for c in db.query(Call).filter(Call.repository_id == repository_id) if c.dynamic
+        ]
+        assert len(dynamic_calls) >= 2
+        for call in dynamic_calls:
+            assert call.callee_id is None
+            assert call.external is True

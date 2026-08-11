@@ -20,6 +20,7 @@ class CallRef:
     name: str
     line: int
     resolved: bool = False
+    dynamic: bool = False
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,7 @@ class ParsedEntity:
     name: str
     kind: EntityKind
     parent: str | None
+    qualified_name: str
     signature: str
     line_start: int
     line_end: int

@@ -36,6 +36,7 @@ class Call(Base):
     callee_name: Mapped[str] = mapped_column(String(255), nullable=False)
     call_line: Mapped[int] = mapped_column(Integer, default=0)
     external: Mapped[bool] = mapped_column(Boolean, default=False)
+    dynamic: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     repository: Mapped[Repository] = relationship(back_populates="calls")

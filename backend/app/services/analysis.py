@@ -82,6 +82,7 @@ def _store_calls(
                 callee_name=ref.name,
                 call_line=ref.line,
                 external=callee_id is None,
+                dynamic=ref.dynamic,
             )
         )
 
@@ -96,7 +97,7 @@ def _store_file(
 ) -> None:
     _store_imports(db, file_row, parsed, language, local_names)
 
-    entity_ids: dict[tuple[str, str | None, str], uuid.UUID] = {}
+    entity_ids: dict[str, uuid.UUID] = {}
     for entity in parsed.entities:
         row = Entity(
             repository_id=repository.id,
@@ -112,6 +113,7 @@ def _store_file(
             is_public=entity.is_public,
             docstring=entity.docstring,
             metadata_json={
+                "qualified_name": entity.qualified_name,
                 "arguments": entity.arguments,
                 "return_type": entity.return_type,
                 "decorators": entity.decorators,
@@ -120,23 +122,22 @@ def _store_file(
         )
         db.add(row)
         db.flush()
-        entity_ids[(entity.kind, entity.parent, entity.name)] = row.id
+        entity_ids[entity.qualified_name] = row.id
 
     for entity in parsed.entities:
-        key = (entity.kind, entity.parent, entity.name)
         if entity.parent is not None:
-            parent_id = entity_ids.get(("class", None, entity.parent))
+            parent_id = entity_ids.get(entity.parent)
             if parent_id is not None:
-                parent_row = db.get(Entity, entity_ids[key])
+                parent_row = db.get(Entity, entity_ids[entity.qualified_name])
                 if parent_row is not None:
                     parent_row.parent_id = parent_id
 
     name_to_id: dict[str, uuid.UUID] = {}
-    for (_, _, name), entity_id in entity_ids.items():
-        name_to_id.setdefault(name, entity_id)
+    for qualified, entity_id in entity_ids.items():
+        name_to_id.setdefault(qualified.rsplit(".", 1)[-1], entity_id)
 
     for entity in parsed.entities:
-        caller_id = entity_ids[(entity.kind, entity.parent, entity.name)]
+        caller_id = entity_ids[entity.qualified_name]
         _store_calls(db, repository, caller_id, entity.calls, name_to_id)
     _store_calls(db, repository, None, parsed.module_calls, name_to_id)
 

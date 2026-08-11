@@ -184,38 +184,67 @@ def _imports(tree: Node) -> list[ImportRef]:
     return result
 
 
+def _class_body(class_node: Node) -> Node:
+    return _field(class_node, "body") or class_node
+
+
+def _iter_class_nodes(
+    container: Node, parent_qualified: str | None
+) -> list[tuple[Node, str | None, str | None]]:
+    """Recursively collect class declarations with their qualified parent."""
+    result: list[tuple[Node, str | None, str | None]] = []
+    for member, doc in _iter_members(container):
+        if member.type != "class_declaration":
+            continue
+        name = _entity_name(member)
+        qualified = name if parent_qualified is None else f"{parent_qualified}.{name}"
+        result.append((member, doc, parent_qualified))
+        result.extend(_iter_class_nodes(_class_body(member), qualified))
+    return result
+
+
+def _iter_method_specs(
+    class_node: Node, class_qualified: str
+) -> list[tuple[Node, str | None, str, set[str]]]:
+    """Recursively collect (method_node, doc, class_qualified, fields) incl. nested classes."""
+    result: list[tuple[Node, str | None, str, set[str]]] = []
+    class_fields = _class_fields(class_node)
+    for member, doc in _iter_members(_class_body(class_node)):
+        if _member_kind(member) == "method":
+            result.append((member, doc, class_qualified, class_fields))
+        elif member.type == "class_declaration":
+            nested_qualified = f"{class_qualified}.{_entity_name(member)}"
+            result.extend(_iter_method_specs(member, nested_qualified))
+    return result
+
+
 def parse_java(source: str | bytes, path: str) -> ParsedFile:
     if isinstance(source, str):
         source = source.encode("utf-8")
     root = _PARSER.parse(source).root_node
 
     module_imports = _imports(root)
-    class_nodes: list[tuple[Node, str | None]] = []
+    class_nodes = _iter_class_nodes(root, None)
     method_specs: list[tuple[Node, str | None, str, set[str]]] = []
+    for class_node, _, parent_qualified in class_nodes:
+        if parent_qualified is None:
+            method_specs.extend(
+                _iter_method_specs(class_node, _entity_name(class_node))
+            )
 
-    for class_node, class_doc in _iter_members(root):
-        if _member_kind(class_node) != "class":
-            continue
-        class_name = _entity_name(class_node)
-        body = _field(class_node, "body") or class_node
-        class_fields = _class_fields(class_node)
-        class_nodes.append((class_node, class_doc))
-        for member, doc in _iter_members(body):
-            if _member_kind(member) == "method":
-                method_specs.append((member, doc, class_name, class_fields))
-
-    local_names = {_entity_name(node) for node, _ in class_nodes}
+    local_names = {_entity_name(node) for node, _, _ in class_nodes}
     for member, _, _, _ in method_specs:
         local_names.add(_entity_name(member))
 
     method_entities: list[ParsedEntity] = []
-    for member, doc, class_name, class_fields in method_specs:
+    for member, doc, class_qualified, class_fields in method_specs:
         name = _entity_name(member)
         method_entities.append(
             ParsedEntity(
                 name=name,
                 kind="method",
-                parent=class_name,
+                parent=class_qualified,
+                qualified_name=f"{class_qualified}.{name}",
                 signature=_signature(member, name),
                 line_start=member.start_point.row + 1,
                 line_end=member.end_point.row + 1,
@@ -234,24 +263,28 @@ def parse_java(source: str | bytes, path: str) -> ParsedFile:
     for method in method_entities:
         complexities_by_class.setdefault(method.parent or "", []).append(method.complexity)
 
-    class_entities = [
-        ParsedEntity(
-            name=_entity_name(node),
-            kind="class",
-            parent=None,
-            signature=_entity_name(node),
-            line_start=node.start_point.row + 1,
-            line_end=node.end_point.row + 1,
-            is_public=_is_public(node),
-            docstring=doc,
-            complexity=max(complexities_by_class.get(_entity_name(node), []), default=1),
-            arguments=[],
-            return_type=None,
-            decorators=[],
-            globals_used=[],
+    class_entities: list[ParsedEntity] = []
+    for node, class_doc, parent_qualified in class_nodes:
+        name = _entity_name(node)
+        qualified = name if parent_qualified is None else f"{parent_qualified}.{name}"
+        class_entities.append(
+            ParsedEntity(
+                name=name,
+                kind="class",
+                parent=parent_qualified,
+                qualified_name=qualified,
+                signature=qualified,
+                line_start=node.start_point.row + 1,
+                line_end=node.end_point.row + 1,
+                is_public=_is_public(node),
+                docstring=class_doc,
+                complexity=max(complexities_by_class.get(qualified, []), default=1),
+                arguments=[],
+                return_type=None,
+                decorators=[],
+                globals_used=[],
+            )
         )
-        for node, doc in class_nodes
-    ]
 
     entities = class_entities + method_entities
     return ParsedFile(path=path, entities=entities, imports=module_imports, module_calls=[])

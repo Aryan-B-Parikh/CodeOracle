@@ -124,3 +124,56 @@ def test_module_calls_at_top_level() -> None:
     parsed = _parsed("python_basic/app.py")
     names = {c.name: c.resolved for c in parsed.module_calls}
     assert names["main"] is True
+
+
+def test_nested_functions_extracted() -> None:
+    parsed = _parsed("python_nested/nested.py")
+    entities = {e.qualified_name: e for e in parsed.entities}
+
+    assert entities["outer"].kind == "function"
+    assert entities["outer"].parent is None
+    assert entities["outer.inner"].kind == "function"
+    assert entities["outer.inner"].parent == "outer"
+    assert entities["outer.inner"].line_start > entities["outer"].line_start
+    assert entities["helper"].parent is None
+
+
+def test_nested_classes_extracted() -> None:
+    parsed = _parsed("python_nested/nested.py")
+    entities = {e.qualified_name: e for e in parsed.entities}
+
+    assert entities["Wrapper"].kind == "class"
+    assert entities["Wrapper.Inner"].kind == "class"
+    assert entities["Wrapper.Inner"].parent == "Wrapper"
+    assert entities["Wrapper.Inner.run"].kind == "method"
+    assert entities["Wrapper.Inner.run"].parent == "Wrapper.Inner"
+    assert entities["Wrapper.Inner._step"].kind == "method"
+    assert entities["Wrapper.make"].parent == "Wrapper"
+
+
+def test_nested_calls_attributed_to_owner() -> None:
+    parsed = _parsed("python_nested/nested.py")
+
+    outer_calls = {c.name for c in _entity(parsed, "outer").calls}
+    assert outer_calls == {"inner", "helper"}
+
+    inner_calls = {c.name for c in _entity(parsed, "inner").calls}
+    assert inner_calls == set()
+
+    run_calls = {c.name: c for c in _entity(parsed, "run").calls}
+    assert run_calls["self._step"].resolved is True
+    assert _entity(parsed, "Inner").calls == []
+
+
+def test_dynamic_calls_marked_not_resolved() -> None:
+    parsed = _parsed("python_nested/nested.py")
+
+    caller = _entity(parsed, "dynamic_caller")
+    calls = {c.name: c for c in caller.calls}
+    getattr_call = calls["getattr(obj, method)"]
+    assert getattr_call.dynamic is True
+    assert getattr_call.resolved is False
+
+    step = _entity(parsed, "_step")
+    dynamic = {c.name: c for c in step.calls if c.dynamic}
+    assert dynamic["getattr(self, 'label', 'none')"].dynamic is True

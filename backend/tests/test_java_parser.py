@@ -99,3 +99,25 @@ def test_fields_used_as_globals() -> None:
     assert "balance" in used
     assert "TRANSACTIONS" in used
     assert "failedAttempts" in used
+
+
+def test_nested_classes_extracted() -> None:
+    parsed = _parsed("java_nested/src/main/java/com/example/nested/Nested.java")
+    entities = {e.qualified_name: e for e in parsed.entities}
+
+    assert entities["Outer"].kind == "class"
+    assert entities["Outer"].parent is None
+
+    assert entities["Outer.Inner"].kind == "class"
+    assert entities["Outer.Inner"].parent == "Outer"
+
+    assert entities["Outer.StaticNested"].kind == "class"
+    assert entities["Outer.StaticNested"].parent == "Outer"
+
+    assert entities["Outer.Inner.run"].kind == "method"
+    assert entities["Outer.Inner.run"].parent == "Outer.Inner"
+    assert entities["Outer.Inner.step"].parent == "Outer.Inner"
+    assert entities["Outer.make"].parent == "Outer"
+
+    run_calls = {c.name: c for c in entities["Outer.Inner.run"].calls}
+    assert run_calls["step"].resolved is True
