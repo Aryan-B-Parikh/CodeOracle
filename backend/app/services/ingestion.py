@@ -53,7 +53,7 @@ def extract_zip(zip_path: Path, dest: Path) -> None:
         raise HTTPException(status_code=422, detail="invalid zip archive") from exc
 
 
-def _collapse_single_top_dir(root: Path) -> Path:
+def collapse_single_top_dir(root: Path) -> Path:
     entries = [p for p in root.iterdir()]
     if len(entries) == 1 and entries[0].is_dir():
         return entries[0]
@@ -109,7 +109,7 @@ def ingest_zip(db: Session, repository: Repository, zip_path: Path, workdir: Pat
     extracted = workdir / "extracted"
     shutil.rmtree(extracted, ignore_errors=True)
     extract_zip(zip_path, extracted)
-    root = _collapse_single_top_dir(extracted)
+    root = collapse_single_top_dir(extracted)
     return scan_and_store(db, repository, root)
 
 

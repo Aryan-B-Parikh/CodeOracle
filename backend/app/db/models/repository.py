@@ -13,6 +13,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
 
 if TYPE_CHECKING:
+    from app.db.models.call import Call
+    from app.db.models.entity import Entity
     from app.db.models.file import File
 
 JSONVariant = JSONB().with_variant(JSON(), "sqlite")
@@ -41,5 +43,11 @@ class Repository(Base):
     )
 
     files: Mapped[list[File]] = relationship(
+        back_populates="repository", cascade="all, delete-orphan"
+    )
+    entities: Mapped[list[Entity]] = relationship(
+        back_populates="repository", cascade="all, delete-orphan"
+    )
+    calls: Mapped[list[Call]] = relationship(
         back_populates="repository", cascade="all, delete-orphan"
     )

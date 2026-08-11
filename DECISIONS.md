@@ -42,6 +42,15 @@
 - **Local PG gotcha:** this machine has a Postgres service squatting on host port 5432 (two listeners). The dev container runs on **5433**; docs/05 gained a troubleshooting note. Role `codeoracle` created with password `codeoracle`.
 - **Verified:** `alembic upgrade head` applied to real PostgreSQL; upload of the `python_basic` fixture returns camelCase JSON, 8 files / 226 LOC, `languages={"python": true}`; rows confirmed via psql. All 15 tests pass, including a network-gated real GitHub clone (`octocat/Hello-World`).
 
+## 2026-08-11 — T-04 Python AST analyzer decisions
+
+- **Parser is pure** (`app/analyzers/python_parser.py`): takes source text, returns typed `ParsedFile` (entities, calls, imports). Uses `ast` + radon; no I/O, no LLM. Call/import `resolved`/`external` decisions happen in the persistence service where repo context exists.
+- **Radon CCN is ground truth** for complexity; verified against manual counts (charge=8, apply_discount=3, legacy_summary=3, monthly_summary=2, get_tax_rate=2, etc.). Class complexity uses radon's `Class.complexity`. mypy override added for radon (no stubs).
+- **Schema additions beyond docs/03 (logged):** `calls.callee_name` (needed to display external/unresolved call targets) and `imports.line` (evidence/citation). `entities.metadata` is mapped via the `metadata_json` Python attribute because SQLAlchemy reserves `metadata`.
+- **Call resolution is file-local** by name; dotted calls resolve via their last component (`self.charge` → `charge`). Cross-file/import-based resolution is deferred to the T-06 graph builder. Calls to module attributes (`customer.load_customer`) stay `external`.
+- **Analysis service** (`app/services/analysis.py`) persists imports, entities (with class→method `parent_id`), and calls (with `external` flag), updates `repository.entity_count`. Runs synchronously for now; Celery orchestration lands in T-07.
+- **Verified:** 25/25 tests (golden extraction + manual CCN counts on the 3 fixture files); migration `0002_entities` applied to real PostgreSQL; e2e on PG = 23 entities / 8 files with correct call edges (`apply_discount`/`calculate_subtotal` resolved, `customer.load_customer`/`tax.calculate_tax` external).
+
 ## Template for new entries
 
 ```
