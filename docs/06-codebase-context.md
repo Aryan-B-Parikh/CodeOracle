@@ -21,9 +21,9 @@ ADRs are short: Context → Decision → Consequences. Append new ones here as d
 - **Consequences:** Higher engineering cost for parsers/indexing; lower hallucination risk; explainability is a differentiator.
 
 ### ADR-002 — Language support: Python + Java only (MVP)
-- **Status:** Accepted
+- **Status:** Accepted (parser sub-choice updated by ADR-008)
 - **Context:** Need strongest enterprise-modernization story for a hackathon; C++ refactoring complexity is very high; JS ecosystem split test runners.
-- **Decision:** Python (`ast`/tree-sitter, pytest + coverage.py) and Java (JavaParser, JUnit + JaCoCo). No C++/JS in MVP.
+- **Decision:** Python (`ast`/tree-sitter, pytest + coverage.py) and Java (tree-sitter-java, JUnit + JaCoCo). No C++/JS in MVP. (The original decision named JavaParser for Java; ADR-008 supersedes that parser choice.)
 - **Consequences:** Clean scope; clear `>60%` coverage story in both languages.
 
 ### ADR-003 — PostgreSQL + pgvector (not FAISS)
@@ -56,10 +56,17 @@ ADRs are short: Context → Decision → Consequences. Append new ones here as d
 - **Decision:** Files are parsed independently in parallel workers; per-file results are then aggregated into the repository graph.
 - **Consequences:** Faster analysis; aggregation step must be deterministic (sort/merge semantics specified in code).
 
+### ADR-008 — Java parsed with tree-sitter-java (not JavaParser)
+- **Status:** Accepted
+- **Context:** The stack originally specified JavaParser for Java. JavaParser requires a JVM; the backend host (and CI) does not guarantee one, and running Java tooling from the Python service adds a second runtime.
+- **Decision:** Java is parsed with `tree-sitter-java` from `app/analyzers/java_parser.py`, returning the same typed `ParsedFile`/`ParsedEntity` shapes as the Python parser so one persistence service covers both languages. JavaParser is no longer an active dependency.
+- **Consequences:** No JVM needed on the backend; same extraction coverage as T-04 (classes, methods, calls, imports, complexity). Cyclomatic complexity for Java uses decision-point counting (class = max of methods) rather than radon, which stays Python-only.
+
 ## Past tradeoffs tracker
 
 | Date | Decision | Replaced by | ADR |
 |---|---|---|---|
 | 2026-08-11 | Initial stack locked | — | 001–007 |
+| 2026-08-11 | Java parsed via JavaParser (ADR-002) | tree-sitter-java | 008 |
 
 Append rows here when a decision changes; note the replacing ADR and the date in `DECISIONS.md` too.

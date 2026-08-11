@@ -43,7 +43,7 @@
 ### Phase 1 — Core ingestion
 - Upload a ZIP archive or import a GitHub repository.
 - Detect languages (Python / Java / unsupported → warn).
-- Parse with AST/tree-sitter/JavaParser; extract files, functions, classes, imports, calls.
+- Parse with Python `ast` / tree-sitter (`tree-sitter-java` for Java); extract files, functions, classes, imports, calls.
 - Build a dependency graph (repository → packages → modules → classes → functions → calls).
 - Support 10,000+ LOC via parallel file processing.
 

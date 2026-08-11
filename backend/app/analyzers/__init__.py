@@ -1,1 +1,1 @@
-"""Static code analyzers (ast / tree-sitter / JavaParser)."""
+"""Static code analyzers (ast / tree-sitter + tree-sitter-java)."""

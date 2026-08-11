@@ -10,7 +10,7 @@ Single source of truth for AI coding tools working on this repo. Read this first
 
 - **Frontend:** React + Vite + TypeScript + Tailwind, Monaco, React Flow, Recharts, TanStack Query
 - **Backend:** Python 3.11+, FastAPI, Celery + Redis, SQLAlchemy 2.x + Alembic
-- **Analysis:** Python `ast` + tree-sitter, JavaParser, NetworkX, Radon
+- **Analysis:** Python `ast` + tree-sitter (incl. `tree-sitter-java` for Java), NetworkX, Radon
 - **Storage:** PostgreSQL 15 + pgvector (HNSW)
 - **AI:** LLM API behind a provider-agnostic gateway (`LLM_PROVIDER`/`LLM_MODEL` env-driven)
 - **Execution:** Docker sandbox (pytest + coverage.py, JUnit + JaCoCo); never run uploaded code on the host

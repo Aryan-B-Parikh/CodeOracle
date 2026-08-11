@@ -10,7 +10,7 @@ CodeOracle turns undocumented legacy repositories into understandable architectu
 - **Repository knowledge graph** — functions, calls, imports, complexity, circular deps, high-risk nodes.
 - **Test → Coverage → Repair loop** — automatic pytest/JUnit generation targeting `>60%` line coverage.
 - **Safe modernization** — diff viewer, breaking-change detection with impacted callers, Refactor Safety Score.
-- **Python + Java** — tree-sitter / Python `ast` / JavaParser static ground truth.
+- **Python + Java** — tree-sitter (incl. `tree-sitter-java`) / Python `ast` static ground truth.
 
 ## Stack
 
@@ -18,7 +18,7 @@ CodeOracle turns undocumented legacy repositories into understandable architectu
 |---|---|
 | Frontend | React + Vite + Tailwind, Monaco, React Flow, Recharts |
 | Backend | FastAPI, Celery + Redis |
-| Analysis | Tree-sitter, Python `ast`, JavaParser, NetworkX, Radon |
+| Analysis | Tree-sitter (+ `tree-sitter-java`), Python `ast`, NetworkX, Radon |
 | Storage | PostgreSQL 15 + pgvector |
 | AI | LLM API behind a provider-agnostic gateway |
 | Execution | Docker sandbox (pytest/coverage.py, JUnit/JaCoCo) |

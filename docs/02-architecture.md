@@ -14,7 +14,7 @@
 | Charts | Recharts | coverage/safety dashboards |
 | Backend | Python 3.11+ / FastAPI | async API |
 | Queue | Celery + Redis | background jobs |
-| Parsing | Tree-sitter, Python `ast`, JavaParser | language analysis |
+| Parsing | Tree-sitter (+ `tree-sitter-java`), Python `ast` | language analysis |
 | Analysis | NetworkX, Radon | graph + complexity |
 | Database | PostgreSQL 15 + pgvector | relational + embeddings |
 | AI | LLM API behind an abstract gateway | switchable provider |
@@ -23,10 +23,10 @@
 
 ## Why these choices (do not "helpfully" swap them)
 
-- **Python + Java** (not JS/C++): best legacy-modernization story. Python AST tooling is excellent and built-in; JavaParser is mature; pytest/JUnit are the de-facto test frameworks; refactoring complexity is medium vs. "very high" for C++.
+- **Python + Java** (not JS/C++): best legacy-modernization story. Python AST tooling is excellent and built-in; tree-sitter grammars for both languages are mature; pytest/JUnit are the de-facto test frameworks; refactoring complexity is medium vs. "very high" for C++.
 - **FastAPI**: async, typed, auto OpenAPI spec for free (feeds the data-model/API-contract doc).
 - **Celery + Redis**: long analysis/test jobs must not block API workers.
-- **Tree-sitter + Python `ast` + JavaParser**: static ground truth. Tree-sitter is incremental & multi-language; Python `ast` is dependency-free for Python; JavaParser gives type info for Java.
+- **Tree-sitter + Python `ast`**: static ground truth. Python `ast` is dependency-free for Python; `tree-sitter-java` parses Java without a JVM on the backend host (JavaParser was evaluated but dropped — see ADR-008).
 - **NetworkX** for graph algorithms (circular dependency detection, centrality → high-risk nodes). **Radon** for complexity (CCN).
 - **PostgreSQL + pgvector**: one store for relational metadata + `embedding` vectors; avoids running a second vector DB (FAISS is the fallback if pgvector ops become painful).
 - **React Flow** (not a bespoke canvas): zoom, search, click, edge highlighting out of the box.

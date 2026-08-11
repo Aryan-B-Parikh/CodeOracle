@@ -15,7 +15,7 @@
   - **AC:** `POST /api/v1/repositories/upload` (ZIP) and `POST /api/v1/repositories/import` (`github_url`) create a `repositories` row; language detection correct on mixed repos; unsupported language → `other` with warning, not failure.
 - [ ] **T-04** Python AST analyzer
   - **AC:** Extracts functions/methods/classes, signatures, `line_start/end`, calls (resolved to local entities where possible), imports, globals usage; complexity (Radon CCN) matches manual count on 3 fixture files.
-- [ ] **T-05** Java parser (JavaParser/tree-sitter)
+- [ ] **T-05** Java parser (tree-sitter-java)
   - **AC:** Same extraction coverage as T-04 for Java fixtures (methods, classes, calls, imports, complexity).
 - [ ] **T-06** Dependency graph builder (NetworkX)
   - **AC:** Repository→package→module→class→function→call graph correct on fixtures; circular-dependency detection; high-risk nodes (high complexity × many callers) computed; `GET .../graph` returns React Flow `nodes`/`edges`.

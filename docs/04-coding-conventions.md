@@ -32,7 +32,7 @@
 │   │   ├── api/            # FastAPI routers (upload, analysis, results, tests, refactor)
 │   │   ├── schemas/        # pydantic models
 │   │   ├── services/       # orchestrators (explanation, tests, refactor, safety)
-│   │   ├── analyzers/      # ast / tree-sitter / JavaParser → typed AST facts
+│   │   ├── analyzers/      # ast / tree-sitter (+ tree-sitter-java) → typed AST facts
 │   │   ├── graph/          # NetworkX builders + algos (circular, high-risk)
 │   │   ├── index/          # chunking + embeddings + pgvector
 │   │   ├── llm/            # provider-agnostic LLM gateway + prompts
