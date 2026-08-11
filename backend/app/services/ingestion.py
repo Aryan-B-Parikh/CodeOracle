@@ -85,6 +85,7 @@ def _language_flags(result: ScanResult) -> dict[str, bool]:
 def scan_and_store(db: Session, repository: Repository, root: Path) -> Repository:
     result = scan_directory(root)
     repository.languages = _language_flags(result)
+    repository.language_counts = result.language_counts
     repository.loc = sum(f.loc for f in result.files)
     repository.file_count = len(result.files)
     repository.warnings = result.warnings

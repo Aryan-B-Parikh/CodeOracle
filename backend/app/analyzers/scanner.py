@@ -18,6 +18,41 @@ LANGUAGE_BY_SUFFIX = {
 
 SUPPORTED_LANGUAGES = ("python", "java")
 
+UNSUPPORTED_BY_SUFFIX = {
+    ".js": "JavaScript",
+    ".jsx": "JavaScript",
+    ".mjs": "JavaScript",
+    ".cjs": "JavaScript",
+    ".ts": "TypeScript",
+    ".tsx": "TypeScript",
+    ".c": "C",
+    ".h": "C",
+    ".cpp": "C++",
+    ".cc": "C++",
+    ".cxx": "C++",
+    ".hpp": "C++",
+    ".hh": "C++",
+    ".cs": "C#",
+    ".go": "Go",
+    ".rs": "Rust",
+    ".rb": "Ruby",
+    ".php": "PHP",
+    ".swift": "Swift",
+    ".kt": "Kotlin",
+    ".kts": "Kotlin",
+    ".sql": "SQL",
+    ".sh": "Shell",
+    ".bash": "Shell",
+    ".zsh": "Shell",
+    ".html": "HTML",
+    ".htm": "HTML",
+    ".css": "CSS",
+    ".vue": "Vue",
+    ".svelte": "Svelte",
+    ".dart": "Dart",
+    ".scala": "Scala",
+}
+
 IGNORED_DIRS = {
     ".git",
     ".venv",
@@ -49,6 +84,9 @@ class DetectedFile:
 class ScanResult:
     files: list[DetectedFile]
     unsupported_count: int
+    unsupported_languages: dict[str, int]
+    unknown_count: int
+    language_counts: dict[str, int]
     warnings: list[str]
 
 
@@ -74,7 +112,8 @@ def _is_ignored(parts: tuple[str, ...]) -> bool:
 
 def scan_directory(root: Path) -> ScanResult:
     detected: list[DetectedFile] = []
-    unsupported = 0
+    unsupported_languages: dict[str, int] = {}
+    unknown = 0
     for path in sorted(root.rglob("*")):
         if not path.is_file():
             continue
@@ -83,7 +122,13 @@ def scan_directory(root: Path) -> ScanResult:
             continue
         language = detect_language(path)
         if language is None:
-            unsupported += 1
+            unsupported_name = UNSUPPORTED_BY_SUFFIX.get(path.suffix.lower())
+            if unsupported_name is not None:
+                unsupported_languages[unsupported_name] = (
+                    unsupported_languages.get(unsupported_name, 0) + 1
+                )
+            else:
+                unknown += 1
             continue
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
@@ -98,12 +143,33 @@ def scan_directory(root: Path) -> ScanResult:
             )
         )
 
+    language_counts: dict[str, int] = {}
+    for file in detected:
+        language_counts[file.language] = language_counts.get(file.language, 0) + 1
+    for name, count in unsupported_languages.items():
+        language_counts[name] = count
+    if unknown:
+        language_counts["other"] = unknown
+    unsupported_count = sum(unsupported_languages.values()) + unknown
+
     warnings: list[str] = []
-    if not detected and unsupported == 0:
+    if not detected and unsupported_count == 0:
         warnings.append("repository contains no files to analyze")
-    if unsupported > 0:
-        warnings.append(f"{unsupported} unsupported file(s) classified as 'other'")
+    if unsupported_languages:
+        names = ", ".join(sorted(unsupported_languages))
+        warnings.append(
+            f"{sum(unsupported_languages.values())} unsupported file(s) across {names}"
+        )
+    if unknown:
+        warnings.append(f"{unknown} file(s) with unrecognized extensions")
     if not any(f.language in SUPPORTED_LANGUAGES for f in detected):
         warnings.append("no supported languages detected (python/java required)")
 
-    return ScanResult(files=detected, unsupported_count=unsupported, warnings=warnings)
+    return ScanResult(
+        files=detected,
+        unsupported_count=unsupported_count,
+        unsupported_languages=unsupported_languages,
+        unknown_count=unknown,
+        language_counts=language_counts,
+        warnings=warnings,
+    )

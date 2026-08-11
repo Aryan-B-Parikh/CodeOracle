@@ -1,5 +1,6 @@
 """Repository ingestion API tests (T-03)."""
 
+import asyncio
 import io
 import zipfile
 from pathlib import Path
@@ -8,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import app.services.ingestion as ingestion
+from app.api.routes import repositories as repo_routes
 
 
 def make_zip(files: dict[str, str]) -> bytes:
@@ -34,6 +36,7 @@ def test_upload_python_zip(client: TestClient) -> None:
     assert data["name"] == "billing"
     assert data["sourceType"] == "zip"
     assert data["languages"] == {"python": True, "java": False, "other": False}
+    assert data["languageCounts"] == {"python": 1}
     assert data["loc"] == 2
     assert data["fileCount"] == 1
     assert data["status"] == "uploaded"
@@ -56,6 +59,7 @@ def test_upload_mixed_languages(client: TestClient) -> None:
     assert response.status_code == 201
     data = response.json()["data"]
     assert data["languages"] == {"python": True, "java": True, "other": False}
+    assert data["languageCounts"] == {"python": 1, "java": 1}
     assert data["fileCount"] == 2
 
 
@@ -71,8 +75,64 @@ def test_upload_unsupported_only_is_not_failure(client: TestClient) -> None:
     assert response.status_code == 201
     data = response.json()["data"]
     assert data["languages"] == {"python": False, "java": False, "other": True}
+    assert data["languageCounts"] == {"JavaScript": 1, "other": 1}
     assert data["fileCount"] == 0
     assert any("unsupported" in w for w in data["warnings"])
+    assert any("JavaScript" in w for w in data["warnings"])
+
+
+def test_upload_mixed_unsupported_breakdown(client: TestClient) -> None:
+    payload = make_zip(
+        {
+            "app.py": "x = 1\n",
+            "script.js": "console.log(1);\n",
+            "legacy.cpp": "#include <iostream>\n",
+            "data.sql": "SELECT 1;\n",
+            "note.md": "# notes\n",
+        }
+    )
+    response = _upload(client, payload)
+
+    assert response.status_code == 201
+    data = response.json()["data"]
+    assert data["languages"] == {"python": True, "java": False, "other": True}
+    assert data["languageCounts"] == {
+        "python": 1,
+        "JavaScript": 1,
+        "C++": 1,
+        "SQL": 1,
+        "other": 1,
+    }
+    assert data["fileCount"] == 1
+    assert any("C++" in w and "JavaScript" in w and "SQL" in w for w in data["warnings"])
+
+
+class _FakeUpload:
+    def __init__(self, chunks: list[bytes]) -> None:
+        self._chunks = chunks
+        self._index = 0
+
+    async def read(self, size: int) -> bytes:
+        if self._index >= len(self._chunks):
+            return b""
+        chunk = self._chunks[self._index]
+        self._index += 1
+        return chunk
+
+
+def test_stream_upload_writes_chunks(tmp_path: Path) -> None:
+    dest = tmp_path / "out.bin"
+    chunks = [b"a" * 4096, b"b" * 4096, b"c" * 4096]
+    asyncio.run(repo_routes._stream_upload(_FakeUpload(chunks), dest, max_bytes=100_000))
+    assert dest.read_bytes() == b"".join(chunks)
+
+
+def test_stream_upload_enforces_size_limit(tmp_path: Path) -> None:
+    dest = tmp_path / "out.bin"
+    with pytest.raises(repo_routes._UploadTooLarge):
+        asyncio.run(
+            repo_routes._stream_upload(_FakeUpload([b"a" * 1000]), dest, max_bytes=100)
+        )
 
 
 def test_upload_invalid_zip_is_rejected(client: TestClient) -> None:

@@ -68,6 +68,11 @@
 - **`pytest -s` in the sandbox** — pytest's fd-level capture was swallowing `os.write(1|2, ...)` floods; raw output must reach the Docker pipe for the stdout/stderr limits to be meaningful.
 - **Escape fixtures** `escape/python/stdout_flood` + `stderr_flood`; both killed at the 1MB cap. Verified: 36/36 tests.
 
+## 2026-08-11 — T-03 hardening (uploads + classification)
+
+- **Streamed uploads** — `POST /repositories/upload` no longer does `await file.read()` (up to 100MB resident). It streams 1MB chunks to the on-disk `source.zip` (`_stream_upload` in `repositories.py`), aborting with 413 when `MAX_UPLOAD_BYTES` is exceeded mid-stream, then ZIP validation runs against the file. On any failure the workdir is removed, so no partial rows/files leak. Flow is now: upload stream → temp file → size enforcement → ZIP validation.
+- **Known-unsupported language classification** — the scanner keeps Python/Java as supported ground truth, but now classifies 30+ known-but-unsupported extensions (JS/TS, C/C++/C#, Go, Rust, SQL, shell, HTML/CSS, etc.) by name. New `repositories.language_counts` JSONB column (migration `0003_language_counts`) stores per-language file counts (`{"python": 8, "JavaScript": 2, "other": 1}`) so the UI can render a Supported/Unsupported breakdown instead of one generic warning. `other` = truly unrecognized extensions; the old `languages` booleans are unchanged.
+
 ## Template for new entries
 
 ```

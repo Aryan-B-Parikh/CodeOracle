@@ -1,5 +1,6 @@
 """Repository ingestion API: upload a ZIP or import from GitHub."""
 
+import shutil
 import uuid
 from pathlib import Path
 from typing import Annotated
@@ -17,14 +18,29 @@ router = APIRouter()
 settings = get_settings()
 
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
+_UPLOAD_CHUNK_BYTES = 1024 * 1024
 
 DbSession = Annotated[Session, Depends(get_db)]
+
+
+class _UploadTooLarge(Exception):
+    pass
 
 
 def _repository_workdir(repository_id: uuid.UUID) -> Path:
     path = settings.upload_dir / str(repository_id)
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+async def _stream_upload(file: UploadFile, dest: Path, max_bytes: int) -> None:
+    total = 0
+    with dest.open("wb") as out:
+        while chunk := await file.read(_UPLOAD_CHUNK_BYTES):
+            total += len(chunk)
+            if total > max_bytes:
+                raise _UploadTooLarge
+            out.write(chunk)
 
 
 @router.post(
@@ -36,18 +52,22 @@ async def upload_repository(
     file: Annotated[UploadFile, File()],
     db: DbSession,
 ) -> RepositoryEnvelope:
-    content = await file.read()
-    if len(content) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="upload exceeds 100MB limit")
-
     filename = Path(file.filename or "repository.zip").stem or "repository"
     repository = Repository(id=uuid.uuid4(), name=filename, source_type="zip")
 
     workdir = _repository_workdir(repository.id)
     zip_path = workdir / "source.zip"
-    zip_path.write_bytes(content)
+    try:
+        await _stream_upload(file, zip_path, MAX_UPLOAD_BYTES)
+    except _UploadTooLarge:
+        shutil.rmtree(workdir, ignore_errors=True)
+        raise HTTPException(status_code=413, detail="upload exceeds 100MB limit") from None
 
-    stored = ingest_zip(db, repository, zip_path, workdir)
+    try:
+        stored = ingest_zip(db, repository, zip_path, workdir)
+    except HTTPException:
+        shutil.rmtree(workdir, ignore_errors=True)
+        raise
     return RepositoryEnvelope(data=RepositoryOut.model_validate(stored))
 
 

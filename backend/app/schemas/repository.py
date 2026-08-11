@@ -20,6 +20,7 @@ class RepositoryOut(BaseModel):
     source_type: str
     github_url: str | None = None
     languages: dict[str, bool] = Field(default_factory=dict)
+    language_counts: dict[str, int] = Field(default_factory=dict)
     loc: int = 0
     entity_count: int = 0
     file_count: int = 0

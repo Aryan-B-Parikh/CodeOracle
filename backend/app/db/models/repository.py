@@ -32,6 +32,7 @@ class Repository(Base):
     source_type: Mapped[str] = mapped_column(String(16), nullable=False)
     github_url: Mapped[str | None] = mapped_column(String(500))
     languages: Mapped[dict] = mapped_column(JSONVariant, default=dict)
+    language_counts: Mapped[dict] = mapped_column(JSONVariant, default=dict)
     loc: Mapped[int] = mapped_column(Integer, default=0)
     entity_count: Mapped[int] = mapped_column(Integer, default=0)
     file_count: Mapped[int] = mapped_column(Integer, default=0)

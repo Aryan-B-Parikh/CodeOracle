@@ -34,7 +34,8 @@ Analysis  1───N Embedding (entity_id → chunk)
 | name | TEXT NOT NULL | |
 | source_type | TEXT | `zip` \| `github` |
 | github_url | TEXT NULL | |
-| languages | JSONB | `{"python": true, "java": true}` |
+| languages | JSONB | `{"python": true, "java": true}` — supported booleans; `other` when unsupported/unknown files present |
+| language_counts | JSONB | per-language file counts incl. known-unsupported (`{"python": 8, "JavaScript": 2, "C++": 1, "other": 1}`); `other` = unrecognized extensions |
 | loc | INTEGER | total lines of code |
 | entity_count | INTEGER | cached count |
 | status | TEXT | `uploaded` \| `scanning` \| `parsing` \| `analyzed` \| `failed` |
