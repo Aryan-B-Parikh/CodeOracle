@@ -10,6 +10,8 @@ from fastapi.testclient import TestClient
 from app.db.models.call import Call
 from app.db.models.entity import Entity
 from app.db.models.file import File
+from app.db.models.import_ import Import
+from app.db.models.inheritance import Inheritance
 from app.db.models.repository import Repository
 from app.db.session import SessionLocal
 from app.services.analysis import analyze_repository
@@ -185,3 +187,64 @@ def test_analyze_nested_entities_and_dynamic_calls(client: TestClient) -> None:
         for call in dynamic_calls:
             assert call.callee_id is None
             assert call.external is True
+
+
+def test_analyze_python_inheritances_persisted(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/repositories/upload",
+        files={"file": ("python_basic.zip", _fixture_zip("python_basic"), "application/zip")},
+    )
+    assert response.status_code == 201
+    repository_id = uuid.UUID(response.json()["data"]["id"])
+
+    with SessionLocal() as db:
+        repository = db.get(Repository, repository_id)
+        assert repository is not None
+        analyze_repository(db, repository)
+
+        edges = db.query(Inheritance).filter(Inheritance.repository_id == repository_id).all()
+        by_parent = {(e.parent_name, e.kind) for e in edges}
+        assert ("ValueError", "extends") in by_parent
+        error_edge = next(e for e in edges if e.parent_name == "ValueError")
+        assert error_edge.parent_id is None
+
+
+def test_analyze_java_modern_inheritances_and_import_kind(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/repositories/upload",
+        files={"file": ("java_modern.zip", _fixture_zip("java_modern"), "application/zip")},
+    )
+    assert response.status_code == 201
+    repository_id = uuid.UUID(response.json()["data"]["id"])
+
+    with SessionLocal() as db:
+        repository = db.get(Repository, repository_id)
+        assert repository is not None
+        analyze_repository(db, repository)
+
+        by_qualified: dict[str, Entity] = {}
+        for entity in db.query(Entity).filter(Entity.repository_id == repository_id):
+            by_qualified[entity.metadata_json["qualified_name"]] = entity
+        assert by_qualified["Shape"].type == "interface"
+        assert by_qualified["Color"].type == "enum"
+        assert by_qualified["Point"].type == "record"
+        assert by_qualified["Marker"].type == "annotation"
+
+        edges = db.query(Inheritance).filter(Inheritance.repository_id == repository_id).all()
+        customer_edge = next(e for e in edges if e.parent_name == "Customer")
+        assert customer_edge.kind == "extends"
+        assert customer_edge.entity_id == by_qualified["PremiumCustomer"].id
+        assert customer_edge.parent_id == by_qualified["Customer"].id
+
+        serializable = next(e for e in edges if e.parent_name == "Serializable")
+        assert serializable.kind == "implements"
+        assert serializable.parent_id is None
+
+        static_import = db.query(Import).filter(
+            Import.module == "java.util.Collections.emptyList"
+        ).all()
+        assert static_import, "no static import persisted"
+        assert all(i.kind == "static" for i in static_import)
+
+        wildcard = db.query(Import).filter(Import.module == "java.io.*").one()
+        assert wildcard.kind == "normal"

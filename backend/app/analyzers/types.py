@@ -5,7 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-EntityKind = Literal["function", "method", "class"]
+EntityKind = Literal[
+    "function", "method", "class", "interface", "enum", "record", "annotation"
+]
+
+INHERITANCE_KINDS = ("extends", "implements")
 
 
 @dataclass(frozen=True)
@@ -13,6 +17,7 @@ class ImportRef:
     module: str
     local_name: str | None
     line: int
+    kind: str = "normal"
 
 
 @dataclass(frozen=True)
@@ -21,6 +26,13 @@ class CallRef:
     line: int
     resolved: bool = False
     dynamic: bool = False
+
+
+@dataclass(frozen=True)
+class InheritanceRef:
+    name: str
+    kind: str
+    line: int
 
 
 @dataclass(frozen=True)
@@ -41,6 +53,8 @@ class ParsedEntity:
     globals_used: list[str]
     calls: list[CallRef] = field(default_factory=list)
     imports: list[ImportRef] = field(default_factory=list)
+    inheritances: list[InheritanceRef] = field(default_factory=list)
+    metadata: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

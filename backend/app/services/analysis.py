@@ -15,6 +15,7 @@ from app.db.models.call import Call
 from app.db.models.entity import Entity
 from app.db.models.file import File
 from app.db.models.import_ import Import
+from app.db.models.inheritance import Inheritance
 from app.db.models.repository import Repository
 from app.services.ingestion import collapse_single_top_dir
 
@@ -56,6 +57,7 @@ def _store_imports(
                 module=ref.module,
                 local_name=ref.local_name,
                 is_external=is_external,
+                kind=ref.kind,
                 line=ref.line,
             )
         )
@@ -118,6 +120,7 @@ def _store_file(
                 "return_type": entity.return_type,
                 "decorators": entity.decorators,
                 "globals": entity.globals_used,
+                **entity.metadata,
             },
         )
         db.add(row)
@@ -135,6 +138,20 @@ def _store_file(
     name_to_id: dict[str, uuid.UUID] = {}
     for qualified, entity_id in entity_ids.items():
         name_to_id.setdefault(qualified.rsplit(".", 1)[-1], entity_id)
+
+    for entity in parsed.entities:
+        for ref in entity.inheritances:
+            db.add(
+                Inheritance(
+                    repository_id=repository.id,
+                    file_id=file_row.id,
+                    entity_id=entity_ids[entity.qualified_name],
+                    parent_id=name_to_id.get(ref.name),
+                    parent_name=ref.name,
+                    kind=ref.kind,
+                    line=ref.line,
+                )
+            )
 
     for entity in parsed.entities:
         caller_id = entity_ids[entity.qualified_name]

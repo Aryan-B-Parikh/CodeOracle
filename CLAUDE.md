@@ -34,7 +34,7 @@ Single source of truth for AI coding tools working on this repo. Read this first
 - Frontend: Prettier (`singleQuote`, no semi), ESLint + TS recommended, one component per PascalCase file.
 - DB: snake_case tables/columns, UUID PKs, `<entity>_id` FKs, `created_at`/`updated_at`.
 - API: `/api/v1/...`, JSON keys camelCase, shared envelope `{ "data", "error" }`.
-- Graph entity types: `function` / `method` / `class`.
+- Graph entity types: `function` / `method` / `class` / `interface` / `enum` / `record` / `annotation`.
 
 ## Quality gates (run before finishing any task)
 

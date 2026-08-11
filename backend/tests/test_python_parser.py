@@ -126,6 +126,17 @@ def test_module_calls_at_top_level() -> None:
     assert names["main"] is True
 
 
+def test_class_bases_extracted_as_inheritances() -> None:
+    tax = _parsed("python_basic/tax.py")
+    error = _entity(tax, "UnknownRegionError")
+    assert [ref.name for ref in error.inheritances] == ["ValueError"]
+    assert error.inheritances[0].kind == "extends"
+
+    billing = _parsed("python_basic/billing.py")
+    invoice_error = _entity(billing, "InvoiceError")
+    assert [ref.name for ref in invoice_error.inheritances] == ["Exception"]
+
+
 def test_nested_functions_extracted() -> None:
     parsed = _parsed("python_nested/nested.py")
     entities = {e.qualified_name: e for e in parsed.entities}

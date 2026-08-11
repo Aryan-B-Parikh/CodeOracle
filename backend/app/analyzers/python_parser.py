@@ -13,7 +13,14 @@ from collections.abc import Iterator
 
 from radon.complexity import cc_visit
 
-from app.analyzers.types import CallRef, EntityKind, ImportRef, ParsedEntity, ParsedFile
+from app.analyzers.types import (
+    CallRef,
+    EntityKind,
+    ImportRef,
+    InheritanceRef,
+    ParsedEntity,
+    ParsedFile,
+)
 
 __all__ = ["CallRef", "EntityKind", "ImportRef", "ParsedEntity", "ParsedFile", "parse_python"]
 
@@ -206,6 +213,18 @@ def parse_python(source: str, path: str) -> ParsedFile:
         complexity = complexity_map.get((parent or "", node.name))
         if complexity is None:
             complexity = complexity_map.get(("", node.name), 1)
+        inheritances = (
+            [
+                InheritanceRef(
+                    name=ast.unparse(base),
+                    kind="extends",
+                    line=node.lineno,
+                )
+                for base in node.bases
+            ]
+            if isinstance(node, ast.ClassDef)
+            else []
+        )
         entities.append(
             ParsedEntity(
                 name=node.name,
@@ -224,6 +243,7 @@ def parse_python(source: str, path: str) -> ParsedFile:
                 globals_used=_globals_used(node, arguments),
                 calls=_collect_calls(node, local_names),
                 imports=_collect_imports(node),
+                inheritances=inheritances,
             )
         )
 

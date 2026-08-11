@@ -121,3 +121,54 @@ def test_nested_classes_extracted() -> None:
 
     run_calls = {c.name: c for c in entities["Outer.Inner.run"].calls}
     assert run_calls["step"].resolved is True
+
+
+def _modern():
+    return _parsed("java_modern/src/main/java/com/example/modern/ModernFeatures.java")
+
+
+def test_modern_declarations_extracted() -> None:
+    parsed = _modern()
+    kinds = {e.qualified_name: e.kind for e in parsed.entities}
+    assert kinds["Customer"] == "class"
+    assert kinds["PremiumCustomer"] == "class"
+    assert kinds["Shape"] == "interface"
+    assert kinds["Color"] == "enum"
+    assert kinds["Point"] == "record"
+    assert kinds["Marker"] == "annotation"
+    assert kinds["Color.hex"] == "method"
+    assert kinds["Point.sum"] == "method"
+    assert kinds["Marker.value"] == "method"
+
+
+def test_inheritance_edges_extracted() -> None:
+    parsed = _modern()
+    edges = {
+        (e.name, ref.name, ref.kind)
+        for e in parsed.entities
+        for ref in e.inheritances
+    }
+    assert ("PremiumCustomer", "Customer", "extends") in edges
+    assert ("PremiumCustomer", "Serializable", "implements") in edges
+    assert ("PremiumCustomer", "Comparable<PremiumCustomer>", "implements") in edges
+    assert ("Shape", "Cloneable", "extends") in edges
+    assert ("Color", "Serializable", "implements") in edges
+    assert ("Point", "Serializable", "implements") in edges
+    assert not any(e.name == "Customer" and e.inheritances for e in parsed.entities)
+
+
+def test_imports_preserved_with_kind() -> None:
+    parsed = _modern()
+    imports = {(i.module, i.kind) for i in parsed.imports}
+    assert ("java.util.List", "normal") in imports
+    assert ("java.util.Collections.emptyList", "static") in imports
+    assert ("java.io.*", "normal") in imports
+
+
+def test_javadoc_structurally_extracted() -> None:
+    parsed = _modern()
+    premium = _entity(parsed, "PremiumCustomer")
+    javadoc = premium.metadata["javadoc"]
+    assert javadoc["description"] == "Premium customer."
+    assert javadoc["tags"]["param"] == ["tier tier code"]
+    assert javadoc["tags"]["return"] == ["discount as fraction"]

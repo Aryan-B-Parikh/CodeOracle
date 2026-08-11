@@ -55,7 +55,7 @@
 - **TypeScript:** `camelCase` functions/vars, `PascalCase` components/types, `UPPER_SNAKE_CASE` constants.
 - **API JSON keys:** `camelCase`.
 - **DB:** see `docs/03-data-model.md` (snake_case tables/columns).
-- **Entity types in graph:** `function` / `method` / `class`.
+- **Entity types in graph:** `function` / `method` / `class` / `interface` / `enum` / `record` / `annotation`.
 
 ## Error handling & logging conventions
 

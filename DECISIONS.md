@@ -78,6 +78,14 @@
 - **Nested entities extracted** (Python: nested functions/classes to arbitrary depth; Java: inner/static-nested classes). Entity identity is now a **qualified name** (`outer.inner`, `Outer.Inner.run`) stored in `entities.metadata_json.qualified_name`; `parent_id` resolves by qualified name, so the old `parent`-as-class-name contract is unchanged for top-level entities (tests untouched).
 - **Dynamic calls are marked, not resolved.** `CallRef.dynamic` flags `getattr(x, n)()` / `getattr(x, n)` / `obj[k]()`; the parser never marks them resolved, and persistence writes `calls.dynamic = true` with `callee_id NULL` + `external true` so the UI can render "⚠ Dynamic call" instead of a definite dependency. Migration `0004_call_dynamic` adds the column.
 
+## 2026-08-11 — T-05: inheritance, modern Java types, imports, javadoc
+
+- **Inheritance edges extracted + persisted** (HIGH). New `inheritances` table (migration `0005_inheritances`): subclass → `parent_name` (as written, incl. generics like `Comparable<PremiumCustomer>`) with `kind` `extends`/`implements` and a `line` for evidence. `parent_id` resolves when the parent type exists locally in the file; cross-file resolution and graph building (CALLS/IMPORTS/INHERITS/IMPLEMENTS) is T-06's job. Python class bases map to `extends`.
+- **Modern Java types modeled** — `interface` / `enum` / `record` / `annotation` are now first-class entity kinds (enum bodies flattened through `enum_body_declarations`; record compact constructors and annotation elements treated as methods). Backward compatible: existing fixture counts unchanged.
+- **Imports preserved** — wildcards and static members no longer stripped (`java.io.*`, `java.util.Collections.emptyList`), and `imports.kind` (`normal`/`static`) added.
+- **Basic javadoc extraction** — `description` + `@tags` (param/return/throws/…) parsed structurally into `entities.metadata.javadoc`; raw comment text stays in `docstring`.
+- **Deferred (documented):** Java call resolution remains file-local (T-06 graph scope); complexity algorithms intentionally differ per language (Radon CCN vs. Java decision-count) and are already documented — UI must label generically as "Cyclomatic complexity".
+
 ## Template for new entries
 
 ```

@@ -27,6 +27,7 @@ class Import(Base):
     module: Mapped[str] = mapped_column(String(255), nullable=False)
     local_name: Mapped[str | None] = mapped_column(String(255))
     is_external: Mapped[bool] = mapped_column(Boolean, default=False)
+    kind: Mapped[str] = mapped_column(String(16), default="normal")
     line: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 

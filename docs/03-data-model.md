@@ -58,7 +58,7 @@ Analysis  1───N Embedding (entity_id → chunk)
 | repository_id | FK | |
 | file_id | FK | |
 | name | TEXT NOT NULL | simple name |
-| type | TEXT | `function` \| `method` \| `class` |
+| type | TEXT | `function` \| `method` \| `class` \| `interface` \| `enum` \| `record` \| `annotation` |
 | parent_id | FK NULL | enclosing entity (method→class, nested class/function→owner) |
 | signature | TEXT | raw signature |
 | language | TEXT | |
@@ -81,14 +81,28 @@ Indexes: `(repository_id, name)`, `(file_id)`.
 | external | BOOLEAN | callee not in repo (stdlib/third-party) |
 | dynamic | BOOLEAN | statically unresolvable dispatch — `getattr(x, n)()`, `obj[k]()` — NOT a definite dependency |
 
+### `inheritances` (edges — subclass → parent)
+| column | type | notes |
+|---|---|---|
+| id | UUID PK | |
+| repository_id | FK | |
+| file_id | FK → files | |
+| entity_id | FK → entities NULL | the subclass |
+| parent_id | FK → entities NULL | resolved when the parent type exists locally in the file |
+| parent_name | TEXT | as written, e.g. `Customer`, `java.io.Serializable`, `Comparable<PremiumCustomer>` |
+| kind | TEXT | `extends` \| `implements` |
+| line | INTEGER | evidence |
+| created_at | TIMESTAMPTZ | |
+
 ### `imports`
 | column | type | notes |
 |---|---|---|
 | id | UUID PK | |
 | file_id | FK | |
-| module | TEXT | imported module name |
-| local_name | TEXT NULL | alias |
+| module | TEXT | preserved original, incl. wildcards/static members (`java.io.*`, `java.util.Collections.emptyList`) |
+| local_name | TEXT NULL | alias (Python) |
 | is_external | BOOLEAN | |
+| kind | TEXT | `normal` \| `static` (Java static import) |
 
 ### `analyses`
 | column | type | notes |
