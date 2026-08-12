@@ -1,8 +1,8 @@
 """Run the Python legacy-code coverage benchmark without Docker.
 
-The benchmark deliberately starts with a small seed suite, measures real
-coverage.py output, then adds focused tests for uncovered behavior and verifies
-that line coverage exceeds the 60% acceptance threshold.
+The benchmark starts with a deliberately partial seed suite, measures real
+coverage.py output, then adds focused tests in three repair iterations and
+verifies that line coverage exceeds the 60% acceptance threshold.
 """
 
 from __future__ import annotations
@@ -10,12 +10,12 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 TESTS = ROOT / "tests"
 COVERAGE_JSON = ROOT / "coverage.json"
+REPAIR_TEST = TESTS / "test_generated_repair.py"
 
 
 def run_pytest() -> float:
@@ -37,29 +37,30 @@ def run_pytest() -> float:
     return float(payload["totals"]["percent_covered"])
 
 
-def write_repair_tests() -> Path:
-    """Write deterministic tests for uncovered branches in the benchmark."""
-    path = TESTS / "test_generated_repair.py"
-    path.write_text(
-        '''from expense.budget import allows, remaining, status\nfrom expense.reporting import summary_line, top_categories\n\n\nEXPENSES = [\n    {"category": "food", "amount": 10.0},\n    {"category": "food", "amount": 50.0},\n    {"category": "travel", "amount": 20.0},\n]\n\n\ndef test_status_all_paths():\n    assert status(100.0, 1000.0) == "OK"\n    assert status(850.0, 1000.0) == "WARNING"\n    assert status(1200.0, 1000.0) == "OVER_BUDGET"\n    try:\n        status(1.0, 0.0)\n    except ValueError:\n        pass\n\n\ndef test_allows_category_monthly_and_positive_paths():\n    assert allows({"category": "food", "amount": 5.0}, EXPENSES, 1000.0, 300.0) is True\n    assert allows({"category": "food", "amount": 250.0}, EXPENSES, 1000.0, 300.0) is False\n    assert allows({"category": "travel", "amount": 950.0}, EXPENSES, 1000.0, 300.0) is False\n    assert allows({"category": "travel", "amount": 0.0}, EXPENSES, 1000.0, 300.0) is False\n\n\ndef test_remaining_and_reporting_branches():\n    assert remaining(EXPENSES, 1000.0) == 920.0\n    assert remaining(EXPENSES, 50.0) == 0.0\n    assert top_categories(EXPENSES, 1) == [("food", 60.0)]\n    assert summary_line(EXPENSES, 100.0) == "spent=80.00 pct=80.0"\n    assert summary_line(EXPENSES, 0.0) == "spent=80.00 pct=0.0"\n''',
-        encoding="utf-8",
-    )
-    return path
+REPAIR_ITERATIONS = [
+    '''from expense.budget import status\n\n\ndef test_status_branches():\n    assert status(100.0, 1000.0) == "OK"\n    assert status(850.0, 1000.0) == "WARNING"\n    assert status(1200.0, 1000.0) == "OVER_BUDGET"\n''',
+    '''from expense.budget import allows, remaining\n\n\nEXPENSES = [\n    {"category": "food", "amount": 10.0},\n    {"category": "food", "amount": 50.0},\n    {"category": "travel", "amount": 20.0},\n]\n\n\ndef test_allows_paths():\n    assert allows({"category": "food", "amount": 5.0}, EXPENSES, 1000.0, 300.0) is True\n    assert allows({"category": "food", "amount": 250.0}, EXPENSES, 1000.0, 300.0) is False\n    assert allows({"category": "travel", "amount": 950.0}, EXPENSES, 1000.0, 300.0) is False\n    assert allows({"category": "travel", "amount": 0.0}, EXPENSES, 1000.0, 300.0) is False\n\n\ndef test_remaining_paths():\n    assert remaining(EXPENSES, 1000.0) == 920.0\n    assert remaining(EXPENSES, 50.0) == 0.0\n''',
+    '''from expense.reporting import summary_line, top_categories\n\n\nEXPENSES = [\n    {"category": "food", "amount": 10.0},\n    {"category": "food", "amount": 50.0},\n    {"category": "travel", "amount": 20.0},\n]\n\n\ndef test_reporting_branches():\n    assert top_categories(EXPENSES, 1) == [("food", 60.0)]\n    assert summary_line(EXPENSES, 100.0) == "spent=80.00 pct=80.0"\n    assert summary_line(EXPENSES, 0.0) == "spent=80.00 pct=0.0"\n''',
+]
 
 
 def main() -> int:
     baseline = run_pytest()
     print(f"BASELINE_COVERAGE={baseline:.1f}%")
     if not 20.0 <= baseline < 50.0:
-        raise AssertionError(
-            f"Expected a partial baseline below 50%; measured {baseline:.1f}%"
-        )
+        raise AssertionError(f"Expected a partial baseline below 50%; measured {baseline:.1f}%")
 
-    generated = write_repair_tests()
     try:
+        for iteration, test_code in enumerate(REPAIR_ITERATIONS, start=1):
+            mode = "w" if iteration == 1 else "a"
+            with REPAIR_TEST.open(mode, encoding="utf-8") as handle:
+                handle.write("\n" + test_code)
+            coverage = run_pytest()
+            print(f"REPAIR_ITERATION_{iteration}_COVERAGE={coverage:.1f}%")
+
         final = run_pytest()
     finally:
-        generated.unlink(missing_ok=True)
+        REPAIR_TEST.unlink(missing_ok=True)
         COVERAGE_JSON.unlink(missing_ok=True)
 
     print(f"FINAL_COVERAGE={final:.1f}%")
