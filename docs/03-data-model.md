@@ -166,7 +166,7 @@ pgvector index: HNSW on `embedding`.
 - `POST /api/v1/repositories/upload` — multipart ZIP → repository id, begins scan.
 - `POST /api/v1/repositories/import` — body `{ "github_url": "..." }`.
 - `GET /api/v1/repositories/{id}` — metadata + status.
-- `GET /api/v1/repositories/{id}/graph` — nodes/edges for React Flow (`{ nodes: [{id, label, type, complexity, file}], edges: [{source, target}] }`).
+- `GET /api/v1/repositories/{id}/graph` — nodes/edges for React Flow (`{ nodes: [{id, label, type, complexity, file, lineStart, lineEnd, qualifiedName, riskScore}], edges: [{source, target, kind}] }`); edge `kind` is `contains` \| `call` \| `imports` \| `inherits` \| `implements`; `meta` holds `circularDependencies: [{cycle}]` (module-level) and `highRiskNodeIds` (top 10 by `complexity × (callers + callees + 1)`).
 - `GET /api/v1/repositories/{id}/entities/{entityId}` — entity metadata + AST facts.
 - `GET /api/v1/repositories/{id}/entities/{entityId}/explanation` — structured LLM explanation with `evidence[]` (`{ claim, file, line_start, line_end, code }`).
 - `GET /api/v1/repositories/{id}/entities/{entityId}/impact` — callers + impact level.

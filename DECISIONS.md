@@ -86,6 +86,15 @@
 - **Basic javadoc extraction** — `description` + `@tags` (param/return/throws/…) parsed structurally into `entities.metadata.javadoc`; raw comment text stays in `docstring`.
 - **Deferred (documented):** Java call resolution remains file-local (T-06 graph scope); complexity algorithms intentionally differ per language (Radon CCN vs. Java decision-count) and are already documented — UI must label generically as "Cyclomatic complexity".
 
+## 2026-08-11 — T-06 dependency graph
+
+- **`app/services/graph.py`** builds the NetworkX graph from persisted facts and serves `GET /api/v1/repositories/{id}/graph` (`app/api/routes/graph.py`) as React Flow `nodes`/`edges` + `meta`.
+- **Nodes:** one `module` node per file plus one node per entity (`{file}::{qualified_name}`) with `type` (function/method/class/interface/enum/record/annotation), complexity, file, line range, `qualifiedName`, `riskScore`.
+- **Edges** carry a `kind`: `contains` (module→entity, parent→child), `call` (incl. **cross-module re-resolution** — `tax.calculate_tax` and import aliases like `from billing import describe_invoice` now resolve at repository scope, matching the fixture's intended edges), `imports` (local), `inherits`/`implements` (from the `inheritances` table). Dynamic calls never become edges.
+- **Circular deps** are detected on the **module** dependency graph (cross-module calls + local imports) — the deliberate `billing ↔ database` import cycle in `python_basic` is correctly reported. Entity-level cycles are aggregated to their modules.
+- **High-risk** = top 10 entities by `complexity × (callers + callees + 1)`, surfaced as `riskScore` per node and `meta.highRiskNodeIds`.
+- Verified: `GET .../graph` on `python_basic` resolves cross-module calls, reports the `[billing.py, database.py]` cycle, and ranks `calculate_invoice` correctly; `java_modern` yields `inherits` edges and all modern type nodes. 56/56 tests.
+
 ## Template for new entries
 
 ```

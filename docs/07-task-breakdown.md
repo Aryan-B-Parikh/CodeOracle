@@ -17,7 +17,7 @@
   - **AC:** Extracts functions/methods/classes, signatures, `line_start/end`, calls (resolved to local entities where possible), imports, globals usage; complexity (Radon CCN) matches manual count on 3 fixture files.
 - [ ] **T-05** Java parser (tree-sitter-java)
   - **AC:** Same extraction coverage as T-04 for Java fixtures (methods, classes, calls, imports, complexity).
-- [ ] **T-06** Dependency graph builder (NetworkX)
+- [x] **T-06** Dependency graph builder (NetworkX)
   - **AC:** Repository→package→module→class→function→call graph correct on fixtures; circular-dependency detection; high-risk nodes (high complexity × many callers) computed; `GET .../graph` returns React Flow `nodes`/`edges`.
 - [ ] **T-07** Parallel pipeline (Celery)
   - **AC:** Files parsed in parallel workers; results aggregate deterministically; `pipeline_state` persists each stage; analysis of a 10K-LOC fixture completes < 5 min; live status endpoint reports correct stage.
