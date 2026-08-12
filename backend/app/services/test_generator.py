@@ -6,6 +6,7 @@ import ast
 import logging
 import re
 import uuid
+from collections import Counter
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -118,18 +119,37 @@ def _build_java_test_fallback(entities: list[Entity]) -> str:
     return "\n".join(lines)
 
 
+def _choose_test_language(
+    target_entities: list[Entity], repository: Repository
+) -> str:
+    """Choose the language from actual target files, not repository dict ordering."""
+    entity_languages = [
+        e.file.language
+        for e in target_entities
+        if e.file and e.file.language in ("python", "java")
+    ]
+    if entity_languages:
+        counts = Counter(entity_languages)
+        return max(counts, key=lambda language: (counts[language], language == "python"))
+
+    file_languages = [
+        f.language
+        for f in repository.files
+        if f.language in ("python", "java")
+    ]
+    if file_languages:
+        counts = Counter(file_languages)
+        return max(counts, key=lambda language: (counts[language], language == "python"))
+
+    return "python"
+
+
 def generate_unit_tests(
     db: Session,
     repository: Repository,
     target_entity_ids: list[uuid.UUID] | None = None,
 ) -> GenerateTestCodeResponse:
     """Generate runnable pytest (Python) or JUnit 4 (Java) test suite based on AST facts."""
-    main_lang = (
-        list(repository.languages.keys())[0].lower()
-        if repository.languages
-        else "python"
-    )
-
     query = db.query(Entity).filter(
         Entity.repository_id == repository.id,
         Entity.type.in_(["function", "method"]),
@@ -146,6 +166,8 @@ def generate_unit_tests(
 
     if not target_entities:
         target_entities = all_entities[:5]
+
+    main_lang = _choose_test_language(target_entities, repository)
 
     functions_info = "\n".join(
         f"- {e.name} ({e.file.path if e.file else 'unknown'}, lines "
@@ -213,7 +235,6 @@ def generate_unit_tests(
     target_func_names = [e.name for e in target_entities]
     tests_count = len(target_entities) * 2
 
-    # Create TestRun record
     test_run = TestRun(
         repository_id=repository.id,
         status="passed",
