@@ -1,60 +1,76 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { TestsTab } from './components/TestsTab'
 import { TestRunData } from './types/test_run'
-
-const initialMockTestRun: TestRunData = {
-  testRunId: 'demo-test-run-1',
-  status: 'passed',
-  iteration: 1,
-  testsGenerated: 10,
-  testsPassed: 10,
-  testsFailed: 0,
-  lineCoverage: 74.6,
-  branchCoverage: 68.2,
-  target: 60.0,
-  targetReached: true,
-  statusLabel: 'PASSED',
-  uncoveredLines: [
-    { file: 'billing.py', line: 82, branch: true },
-    { file: 'billing.py', line: 91, branch: false },
-    { file: 'tax.py', line: 45, branch: false },
-  ],
-  failedTests: [],
-  testCode: `import pytest
-
-def test_calculate_tax_main_branch():
-    """Test main branch execution of calculate_tax."""
-    assert True
-
-def test_calculate_tax_exception_path():
-    """Test exception path handling of calculate_tax."""
-    with pytest.raises(ValueError):
-        raise ValueError("Invalid tax rate")
-`,
-  createdAt: new Date().toISOString(),
-}
+import { fetchLatestTestRun, triggerGenerateUncovered } from './services/api'
 
 export function App() {
   const [activeTab, setActiveTab] = useState<'overview' | 'architecture' | 'explanations' | 'impact' | 'tests' | 'refactor'>('tests')
-  const [testRunData, setTestRunData] = useState<TestRunData | null>(initialMockTestRun)
+  const [repositoryId] = useState<string | null>(null)
+  const [testRunData, setTestRunData] = useState<TestRunData | null>(null)
   const [loading, setLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const handleGenerateUncovered = () => {
+  // Fetch latest test run from backend API on mount or repositoryId change
+  useEffect(() => {
+    if (!repositoryId) return
+
+    let isMounted = true
     setLoading(true)
-    setTimeout(() => {
-      if (testRunData) {
-        setTestRunData({
-          ...testRunData,
-          iteration: testRunData.iteration + 1,
-          lineCoverage: Math.min(95.0, testRunData.lineCoverage + 15.0),
-          branchCoverage: Math.min(90.0, testRunData.branchCoverage + 12.0),
-          uncoveredLines: testRunData.uncoveredLines.slice(1),
-          targetReached: true,
-          statusLabel: 'PASSED',
-        })
+    fetchLatestTestRun(repositoryId)
+      .then((envelope) => {
+        if (isMounted && envelope.data) {
+          setTestRunData(envelope.data)
+          setErrorMessage(null)
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          logger_error('Failed to load test run:', err)
+        }
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false)
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [repositoryId])
+
+  const handleGenerateUncovered = async () => {
+    if (!repositoryId) {
+      // Demo fallback if no active repositoryId is selected
+      setLoading(true)
+      setTimeout(() => {
+        if (testRunData) {
+          setTestRunData({
+            ...testRunData,
+            iteration: testRunData.iteration + 1,
+            lineCoverage: Math.min(95.0, testRunData.lineCoverage + 15.0),
+            branchCoverage: Math.min(90.0, testRunData.branchCoverage + 12.0),
+            uncoveredLines: testRunData.uncoveredLines.slice(1),
+            targetReached: true,
+            statusLabel: 'PASSED',
+          })
+        }
+        setLoading(false)
+      }, 500)
+      return
+    }
+
+    setLoading(true)
+    setErrorMessage(null)
+    try {
+      const envelope = await triggerGenerateUncovered(repositoryId, 3, 60.0)
+      if (envelope.data) {
+        setTestRunData(envelope.data)
       }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setErrorMessage(`Coverage repair failed: ${msg}`)
+    } finally {
       setLoading(false)
-    }, 800)
+    }
   }
 
   return (
@@ -83,10 +99,19 @@ export function App() {
         </nav>
       </header>
 
+      {/* Error Alert (if any) */}
+      {errorMessage && (
+        <div style={styles.errorBanner}>
+          <span>{errorMessage}</span>
+          <button onClick={() => setErrorMessage(null)} style={styles.closeBtn}>×</button>
+        </div>
+      )}
+
       {/* Main Tab Content */}
       <main style={styles.mainContent}>
         {activeTab === 'tests' && (
           <TestsTab
+            repositoryId={repositoryId || undefined}
             testRunData={testRunData}
             loading={loading}
             onGenerateUncovered={handleGenerateUncovered}
@@ -102,6 +127,11 @@ export function App() {
       </main>
     </div>
   )
+}
+
+function logger_error(msg: string, err: unknown) {
+  // Simple error logger helper for frontend
+  console.error(msg, err)
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -150,6 +180,22 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'color 0.2s',
+  },
+  errorBanner: {
+    backgroundColor: '#7f1d1d',
+    color: '#fecaca',
+    padding: '12px 24px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    fontSize: '14px',
+  },
+  closeBtn: {
+    backgroundColor: 'transparent',
+    border: 'none',
+    color: '#fecaca',
+    fontSize: '18px',
+    cursor: 'pointer',
   },
   mainContent: {
     padding: '0',

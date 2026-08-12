@@ -105,22 +105,21 @@ def execute_sandbox_test_run(
                 exit_code = 125
                 reason = f"sandbox error: {exc}"
         else:
-            logger.info(
-                "Docker sandbox unavailable; using deterministic coverage measurement"
-            )
-            line_cov = 74.6
-            branch_cov = 68.2
-            uncovered = [
-                {"file": f.path, "line": 45, "branch": False}
-                for f in repository.files
-                if "test" not in f.path.lower()
-            ][:3]
+            logger.warning("Docker sandbox unavailable; failing test run closed")
+            exit_code = 125
+            reason = "Docker daemon unavailable (sandbox environment requirement)"
             coverage_data = {
-                "lineCoverage": line_cov,
-                "branchCoverage": branch_cov,
-                "uncoveredLines": uncovered,
+                "lineCoverage": 0.0,
+                "branchCoverage": 0.0,
+                "uncoveredLines": [
+                    {"file": f.path, "line": 1, "branch": False}
+                    for f in repository.files
+                    if "test" not in f.path.lower()
+                ][:5],
             }
-            log_output = "Sandbox execution simulated cleanly (Docker daemon offline)."
+            log_output = (
+                "Execution failed closed: Docker sandbox daemon is offline or image missing."
+            )
 
         is_passed = (exit_code == 0) and not timed_out
         status = "passed" if is_passed else "failed"

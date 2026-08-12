@@ -81,13 +81,26 @@ def _build_python_test_fallback(entities: list[Entity]) -> str:
         lines.append("    assert callable(func)")
         lines.append("")
 
+        sig = entity.signature or ""
+        param_count = 1
+        if "(" in sig and ")" in sig:
+            params_str = sig[sig.find("(") + 1 : sig.rfind(")")]
+            param_list = [
+                p.strip()
+                for p in params_str.split(",")
+                if p.strip() and p.strip() not in ("self", "cls")
+            ]
+            param_count = len(param_list)
+
+        args_str = ", ".join(["None"] * param_count) if param_count > 0 else ""
+
         lines.append(f"def test_{func_name}_exception_path():")
         lines.append(
             f'    """Test exception handling / boundary condition of {func_name}."""'
         )
         lines.append("    with pytest.raises((ValueError, TypeError, KeyError, Exception)):")
         lines.append(f"        func = getattr({stem}, '{func_name}')")
-        lines.append("        func(None, None, None, None, None)")
+        lines.append(f"        func({args_str})")
         lines.append("")
 
     return "\n".join(lines)
@@ -424,11 +437,9 @@ def generate_uncovered_tests(
             test_code=current_test_code,
         )
         current_run.iteration = iteration_num
-
-        if current_run.line_coverage < target_coverage and current_run.status == "passed":
-            current_run.line_coverage = min(95.0, round(current_run.line_coverage + 32.0, 1))
-            current_run.branch_coverage = min(90.0, round(current_run.branch_coverage + 25.0, 1))
-            current_run.target_reached = True
+        current_run.target_reached = (
+            current_run.line_coverage >= target_coverage
+        ) and (current_run.status == "passed")
 
         db.add(current_run)
         db.commit()
