@@ -158,6 +158,12 @@
 - **Isolation & Fail-Closed Policy:** Hardened execution against `backend/tests/fixtures/escape/` (`busy_loop` timeout 124, `memory_hog` OOM 137, `stdout_flood` / `stderr_flood` limit 125). Automatically records line/branch coverage %, target status (`>60%`), uncovered line list, and failed test list.
 - **Verified:** 13 unit/integration tests in `backend/tests/test_sandbox.py` covering sandbox hardening, size limits, fixture coverage extraction, escape attempts, and host service integration.
 
+## 2026-08-12 — T-15 Coverage repair loop
+
+- **`app/services/test_generator.py` + `app/api/routes/tests.py`**: Implemented `generate_uncovered_tests` service function and `POST /api/v1/repositories/{id}/tests/generate-uncovered` API route.
+- **Iterative Coverage Repair:** Uses `TEST_REPAIR_SYSTEM` and `TEST_REPAIR_USER` prompts targeting `uncovered_lines`. Runs up to `max_iterations=3` until `line_coverage >= 60.0%` (meeting benchmark contract `benchmark/legacy_demo` starting ~30–40% baseline and reaching `>60%` within 3 iterations).
+- **Verified:** 3 unit/integration tests in `backend/tests/test_repair.py`.
+
 ## Template for new entries
 
 ```

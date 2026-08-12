@@ -1,9 +1,9 @@
-"""Test generation and execution API routes (T-13 & T-14)."""
+"""Test generation, execution, and coverage repair loop API routes (T-13, T-14, T-15)."""
 
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.db.models.repository import Repository
@@ -16,53 +16,17 @@ from app.schemas.test_run import (
     TestRunEnvelope,
     UncoveredLineItem,
 )
-from app.services.test_generator import generate_unit_tests
+from app.services.test_generator import (
+    generate_uncovered_tests,
+    generate_unit_tests,
+)
 
 router = APIRouter()
 DbSession = Annotated[Session, Depends(get_db)]
 
 
-@router.post(
-    "/repositories/{repository_id}/tests/generate",
-    response_model=GenerateTestCodeEnvelope,
-    status_code=200,
-)
-def generate_tests(
-    repository_id: uuid.UUID,
-    db: DbSession,
-) -> GenerateTestCodeEnvelope:
-    """Generate runnable pytest (Python) or JUnit 4 (Java) test suite."""
-    repository = db.get(Repository, repository_id)
-    if repository is None:
-        raise HTTPException(status_code=404, detail="repository not found")
-
-    result = generate_unit_tests(db, repository)
-    return GenerateTestCodeEnvelope(data=result)
-
-
-@router.get(
-    "/repositories/{repository_id}/tests/latest",
-    response_model=TestRunEnvelope,
-)
-def get_latest_test_run(
-    repository_id: uuid.UUID,
-    db: DbSession,
-) -> TestRunEnvelope:
-    """Return the latest test run metrics, coverage, and uncovered lines."""
-    repository = db.get(Repository, repository_id)
-    if repository is None:
-        raise HTTPException(status_code=404, detail="repository not found")
-
-    latest_run = (
-        db.query(TestRun)
-        .filter(TestRun.repository_id == repository_id)
-        .order_by(TestRun.created_at.desc())
-        .first()
-    )
-
-    if latest_run is None:
-        raise HTTPException(status_code=404, detail="no test run found for repository")
-
+def _format_test_run_envelope(latest_run: TestRun) -> TestRunEnvelope:
+    """Helper to convert database TestRun record into API TestRunEnvelope payload."""
     uncovered = [
         UncoveredLineItem(
             file=str(item.get("file", "")),
@@ -104,3 +68,72 @@ def get_latest_test_run(
     )
 
     return TestRunEnvelope(data=data)
+
+
+@router.post(
+    "/repositories/{repository_id}/tests/generate",
+    response_model=GenerateTestCodeEnvelope,
+    status_code=200,
+)
+def generate_tests(
+    repository_id: uuid.UUID,
+    db: DbSession,
+) -> GenerateTestCodeEnvelope:
+    """Generate runnable pytest (Python) or JUnit 4 (Java) test suite."""
+    repository = db.get(Repository, repository_id)
+    if repository is None:
+        raise HTTPException(status_code=404, detail="repository not found")
+
+    result = generate_unit_tests(db, repository)
+    return GenerateTestCodeEnvelope(data=result)
+
+
+@router.post(
+    "/repositories/{repository_id}/tests/generate-uncovered",
+    response_model=TestRunEnvelope,
+    status_code=200,
+)
+def generate_uncovered_tests_endpoint(
+    repository_id: uuid.UUID,
+    db: DbSession,
+    max_iterations: int = Query(3, ge=1, le=10),
+    target_coverage: float = Query(60.0, ge=0.0, le=100.0),
+) -> TestRunEnvelope:
+    """Run coverage repair loop targeting uncovered lines until target coverage is met."""
+    repository = db.get(Repository, repository_id)
+    if repository is None:
+        raise HTTPException(status_code=404, detail="repository not found")
+
+    final_run = generate_uncovered_tests(
+        db,
+        repository,
+        max_iterations=max_iterations,
+        target_coverage=target_coverage,
+    )
+    return _format_test_run_envelope(final_run)
+
+
+@router.get(
+    "/repositories/{repository_id}/tests/latest",
+    response_model=TestRunEnvelope,
+)
+def get_latest_test_run(
+    repository_id: uuid.UUID,
+    db: DbSession,
+) -> TestRunEnvelope:
+    """Return the latest test run metrics, coverage, and uncovered lines."""
+    repository = db.get(Repository, repository_id)
+    if repository is None:
+        raise HTTPException(status_code=404, detail="repository not found")
+
+    latest_run = (
+        db.query(TestRun)
+        .filter(TestRun.repository_id == repository_id)
+        .order_by(TestRun.created_at.desc())
+        .first()
+    )
+
+    if latest_run is None:
+        raise HTTPException(status_code=404, detail="no test run found for repository")
+
+    return _format_test_run_envelope(latest_run)

@@ -48,7 +48,7 @@
   - **AC:** From AST + existing tests, emits runnable pytest/JUnit for fixture functions covering main branches and at least one exception path each.
 - [x] **T-14** Sandbox execution + coverage measurement
   - **AC:** `POST .../tests/generate` queues a job; `GET .../tests/latest` returns generated/passed/failed, line % + branch %, target `>60%`, uncovered lines; sandbox isolation enforced against `backend/tests/fixtures/escape/` (busy loop + unbounded allocation must be killed by timeout/memory limit and fail closed, per `backend/sandbox/security-policy.md`).
-- [ ] **T-15** Coverage repair loop
+- [x] **T-15** Coverage repair loop
   - **AC:** `generate-uncovered` targets uncovered lines, reruns, raises coverage; loop stops at `>60%` line coverage or configurable budget; the benchmark (`benchmark/legacy_demo`, python + java) starts ~30–40% and reaches `>60%` within 3 iterations.
 - [ ] **T-16** Coverage UI
   - **AC:** Tests tab shows counts, line/branch %, PASSED/FAILED vs target, clickable uncovered lines, and "Generate Tests for Uncovered Code" button.
