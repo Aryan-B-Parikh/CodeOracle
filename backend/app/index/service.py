@@ -51,10 +51,15 @@ def _is_test_file(file_row: File) -> bool:
 
 
 def _coerce_list(value: object) -> list[float]:
-    """numpy.ndarray (pgvector reader) -> list[float]; JSON list passes through."""
+    """Convert pgvector/numpy values or JSON sequences into a float list."""
     if hasattr(value, "tolist"):
-        return list(value.tolist())  # type: ignore[attr-defined]
-    return list(value)  # type: ignore[arg-type]
+        converted = value.tolist()
+        if not isinstance(converted, list):
+            raise TypeError("Expected a one-dimensional embedding")
+        return [float(item) for item in converted]
+    if isinstance(value, (list, tuple)):
+        return [float(item) for item in value]
+    raise TypeError(f"Unsupported embedding value: {type(value).__name__}")
 
 
 def _content_hash(text: str) -> str:
@@ -104,7 +109,11 @@ def embed_cached(db: Session, texts: list[str]) -> list[list[float]]:
     for vector, index in zip(missing_vectors, needed_indices, strict=True):
         vectors[index] = vector
 
-    assert all(v is not None for v in vectors), "embed_cached produced None values"
+    resolved_vectors: list[list[float]] = []
+    for vector in vectors:
+        if vector is None:
+            raise RuntimeError("embed_cached produced a missing embedding")
+        resolved_vectors.append(vector)
 
     new_rows = [
         EmbeddingCache(
@@ -118,7 +127,7 @@ def embed_cached(db: Session, texts: list[str]) -> list[list[float]]:
     if new_rows:
         db.add_all(new_rows)
         db.commit()
-    return vectors
+    return resolved_vectors
 
 
 def create_index(db: Session, repository: Repository) -> int:
