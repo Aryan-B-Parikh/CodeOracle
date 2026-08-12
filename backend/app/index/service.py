@@ -103,19 +103,19 @@ def embed_cached(db: Session, texts: list[str]) -> list[list[float]]:
         else []
     )
 
-    vectors: list[list[float] | None] = [None] * len(hashes)
+    vectors_by_index: dict[int, list[float]] = {}
     for i, h in enumerate(hashes):
-        if h in by_hash:
-            vectors[i] = by_hash[h]
+        cached = by_hash.get(h)
+        if cached is not None:
+            vectors_by_index[i] = cached
 
     for vector, index in zip(missing_vectors, needed_indices, strict=True):
-        vectors[index] = vector
+        vectors_by_index[index] = vector
 
-    resolved_vectors: list[list[float]] = []
-    for vector in vectors:
-        if vector is None:
-            raise RuntimeError("embed_cached produced a missing embedding")
-        resolved_vectors.append(vector)
+    if len(vectors_by_index) != len(hashes):
+        raise RuntimeError("embed_cached produced incomplete embeddings")
+
+    resolved_vectors = [vectors_by_index[i] for i in range(len(hashes))]
 
     new_rows = [
         EmbeddingCache(
