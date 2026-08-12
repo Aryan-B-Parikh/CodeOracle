@@ -39,7 +39,8 @@ JAVA_CMD = (
     "cd /home/codeoracle/project && "
     "mvn -o -q test jacoco:report && "
     "(python3 /opt/parse_jacoco.py /home/codeoracle/project/target/site/jacoco/jacoco.xml "
-    "2>/dev/null || echo '{\"lineCoverage\": 0.0, \"branchCoverage\": 0.0, \"uncoveredLines\": []}')"
+    "2>/dev/null || echo '{\"lineCoverage\": 0.0, \"branchCoverage\": 0.0, "
+    "\"uncoveredLines\": []}')"
 )
 
 

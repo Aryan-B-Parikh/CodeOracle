@@ -132,3 +132,28 @@ def test_stderr_limit_kills_flood_fixture(tmp_path: Path) -> None:
     result = sandbox_run.run(tmp_path, "python", timeout=60, image=sandbox_run.IMAGE)
     assert result["reason"] == "stderr limit exceeded"
     assert result["exitCode"] == 125
+
+
+def test_execute_sandbox_test_run_service() -> None:
+    from app.db.models.repository import Repository
+    from app.db.session import SessionLocal
+    from app.services.sandbox_runner import execute_sandbox_test_run
+    import uuid
+
+    with SessionLocal() as db:
+        repo = Repository(
+            id=uuid.uuid4(),
+            name="test-repo",
+            source_type="zip",
+            languages={"python": True},
+            loc=100,
+        )
+        db.add(repo)
+        db.commit()
+
+        test_run = execute_sandbox_test_run(db, repo, test_code="def test_sample(): assert True")
+        assert test_run.id is not None
+        assert test_run.status in ("passed", "failed")
+        assert test_run.line_coverage >= 0.0
+        assert isinstance(test_run.uncovered_lines, list)
+

@@ -14,7 +14,6 @@ from sqlalchemy.orm import Session
 from app.db.models.entity import Entity
 from app.db.models.repository import Repository
 from app.db.models.test_case import TestCase
-from app.db.models.test_run import TestRun
 from app.llm import get_llm_gateway
 from app.llm.prompts.test_generation import (
     TEST_GENERATION_SYSTEM,
@@ -232,25 +231,16 @@ def generate_unit_tests(
         else:
             generated_code = _build_python_test_fallback(target_entities)
 
-    target_func_names = [e.name for e in target_entities]
-    tests_count = len(target_entities) * 2
+    from app.services.sandbox_runner import execute_sandbox_test_run
 
-    test_run = TestRun(
-        repository_id=repository.id,
-        status="passed",
-        iteration=1,
-        tests_generated=tests_count,
-        tests_passed=tests_count,
-        tests_failed=0,
-        line_coverage=75.0,
-        branch_coverage=70.0,
-        target=60.0,
-        target_reached=True,
+    target_func_names = [e.name for e in target_entities]
+
+    # Run sandbox execution & coverage measurement
+    test_run = execute_sandbox_test_run(
+        db=db,
+        repository=repository,
         test_code=generated_code,
-        log="Generated pytest / JUnit 4 test suite execution succeeded cleanly.",
     )
-    db.add(test_run)
-    db.flush()
 
     for e in target_entities:
         db.add(

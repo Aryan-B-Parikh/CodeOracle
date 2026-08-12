@@ -152,6 +152,12 @@
 - **AST-grounded test generation:** Emits runnable pytest (Python) and JUnit 4 (Java) test suites covering main execution branches and exception paths (`pytest.raises(...)` / `@Test(expected = ...)`). Includes AST-driven fallback generator producing syntactically valid runnable tests.
 - **Verified:** 3 unit/integration tests in `backend/tests/test_generator.py` verifying AST syntax compilation (`ast.parse(code)`), branch/exception test generation, and `docs/api-examples/tests.json` schema compliance.
 
+## 2026-08-12 — T-14 Sandbox execution + coverage measurement
+
+- **`app/services/sandbox_runner.py` + `backend/sandbox/run.py`**: Integrated Docker sandbox runner into backend service layer (`execute_sandbox_test_run`).
+- **Isolation & Fail-Closed Policy:** Hardened execution against `backend/tests/fixtures/escape/` (`busy_loop` timeout 124, `memory_hog` OOM 137, `stdout_flood` / `stderr_flood` limit 125). Automatically records line/branch coverage %, target status (`>60%`), uncovered line list, and failed test list.
+- **Verified:** 13 unit/integration tests in `backend/tests/test_sandbox.py` covering sandbox hardening, size limits, fixture coverage extraction, escape attempts, and host service integration.
+
 ## Template for new entries
 
 ```
