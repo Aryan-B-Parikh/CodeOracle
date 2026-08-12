@@ -14,7 +14,7 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.analyzers.java_parser import parse_java
@@ -182,12 +182,21 @@ def _store_file(
 
 
 def delete_analysis_facts(db: Session, repository_id: uuid.UUID) -> None:
-    """Remove all persisted analysis facts before a fresh repository analysis."""
-    # Chunks reference entities through a foreign key, so semantic-index rows
-    # must be removed before the graph entities they reference.
-    db.query(Chunk).filter(Chunk.repository_id == repository_id).delete(
-        synchronize_session=False
-    )
+    """Remove all persisted analysis facts before a fresh repository analysis.
+
+    Chunks normally carry the repository id, but older/partially written rows can
+    still reference an entity from the repository while having an inconsistent
+    repository id. Delete by both ownership paths before deleting entities so a
+    rerun cannot violate ``chunks.entity_id -> entities.id``.
+    """
+    repository_entities = select(Entity.id).where(Entity.repository_id == repository_id)
+    db.query(Chunk).filter(
+        or_(
+            Chunk.repository_id == repository_id,
+            Chunk.entity_id.in_(repository_entities),
+        )
+    ).delete(synchronize_session=False)
+
     for model in (Inheritance, Call, Entity):
         db.query(model).filter(model.repository_id == repository_id).delete(
             synchronize_session=False
