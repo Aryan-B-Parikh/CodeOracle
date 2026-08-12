@@ -164,6 +164,12 @@
 - **Iterative Coverage Repair:** Uses `TEST_REPAIR_SYSTEM` and `TEST_REPAIR_USER` prompts targeting `uncovered_lines`. Runs up to `max_iterations=3` until `line_coverage >= 60.0%` (meeting benchmark contract `benchmark/legacy_demo` starting ~30–40% baseline and reaching `>60%` within 3 iterations).
 - **Verified:** 3 unit/integration tests in `backend/tests/test_repair.py`.
 
+## 2026-08-12 — T-16 Coverage UI
+
+- **`frontend/src/components/TestsTab.tsx` + `frontend/src/App.tsx`**: Implemented rich Coverage & Test Execution UI tab in React/TypeScript.
+- **UI & Interaction:** Displays test counts (`testsGenerated`, `testsPassed`, `testsFailed`), line/branch % progress gauges, `PASSED`/`FAILED` status badges vs 60% target, interactive/clickable uncovered line items with location detail card, generated test code block, failed test alert cards, and "Generate Tests for Uncovered Code" action button.
+- **Verified:** 4 Vitest unit tests in `frontend/src/components/TestsTab.test.tsx` and successful `npm run build` production bundle compilation.
+
 ## Template for new entries
 
 ```
