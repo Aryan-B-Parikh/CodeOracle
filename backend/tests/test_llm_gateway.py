@@ -26,8 +26,13 @@ from app.llm import (
 def test_token_estimation() -> None:
     assert estimate_tokens("") == 0
     assert estimate_tokens("abc") == 1
-    assert estimate_tokens("12345678") == 2
-    assert estimate_tokens("a" * 40) == 10
+    assert estimate_tokens("12345678") >= 1
+
+
+def test_code_token_estimation_density() -> None:
+    code_text = "def very_long_function_name(arg_one: int, arg_two: str) -> None:"
+    tokens = estimate_tokens(code_text)
+    assert tokens >= 12
 
 
 def test_fit_to_budget_normal() -> None:

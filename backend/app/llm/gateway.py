@@ -53,12 +53,44 @@ class TokenBudgetExceededError(LLMError):
     """Raised when prompt + system instructions exceed token budget even after truncation."""
 
 
-def estimate_tokens(text: str) -> int:
-    """Fast character/word heuristic token estimator (~4 chars per token)."""
+_CODE_TOKEN_RE = re.compile(
+    r"[A-Z]+(?=[A-Z][a-z]|[0-9]|$)|[A-Z]?[a-z]+|[0-9]+|[_\W]"
+)
+
+
+def _heuristic_token_count(text: str) -> int:
+    """Code-dense token heuristic recognizing punctuation, symbols, and identifier boundaries."""
     if not text:
         return 0
-    # Heuristic: 1 token ~ 4 characters in standard English/code
-    return max(1, math.ceil(len(text) / 4.0))
+    tokens = _CODE_TOKEN_RE.findall(text)
+    if not tokens:
+        return max(1, math.ceil(len(text) / 4.0))
+    count = 0
+    for tok in tokens:
+        if tok.isspace():
+            continue
+        count += max(1, math.ceil(len(tok) / 4.0))
+    return max(1, count)
+
+
+def estimate_tokens(text: str, model: str = "") -> int:
+    """Provider/model tokenizer when available (tiktoken), or code-aware fallback."""
+    if not text:
+        return 0
+
+    if model:
+        try:
+            import tiktoken
+
+            try:
+                encoding = tiktoken.encoding_for_model(model)
+            except KeyError:
+                encoding = tiktoken.get_encoding("cl100k_base")
+            return len(encoding.encode(text))
+        except ImportError:
+            pass
+
+    return _heuristic_token_count(text)
 
 
 def fit_to_budget(
@@ -66,13 +98,14 @@ def fit_to_budget(
     system: str = "",
     budget: int = 8192,
     reserve_completion_tokens: int = 2048,
+    model: str = "",
 ) -> tuple[str, bool]:
     """Ensure system + prompt fits within total token budget.
 
     Truncates user prompt if needed while preserving system instructions.
     Returns (processed_prompt, was_truncated).
     """
-    system_tokens = estimate_tokens(system)
+    system_tokens = estimate_tokens(system, model=model)
     available_input_tokens = budget - reserve_completion_tokens - system_tokens
 
     if available_input_tokens <= 0:
@@ -81,7 +114,7 @@ def fit_to_budget(
             f"({budget - reserve_completion_tokens} input tokens)."
         )
 
-    prompt_tokens = estimate_tokens(prompt)
+    prompt_tokens = estimate_tokens(prompt, model=model)
     if prompt_tokens <= available_input_tokens:
         return prompt, False
 
@@ -191,7 +224,7 @@ class OpenAIProvider:
         self._external_client = client
 
     def count_tokens(self, text: str) -> int:
-        return estimate_tokens(text)
+        return estimate_tokens(text, model=self.model)
 
     def _get_client(self) -> httpx.Client:
         if self._external_client is not None:
@@ -283,7 +316,7 @@ class AnthropicProvider:
         self._external_client = client
 
     def count_tokens(self, text: str) -> int:
-        return estimate_tokens(text)
+        return estimate_tokens(text, model=self.model)
 
     def _get_client(self) -> httpx.Client:
         if self._external_client is not None:
@@ -380,11 +413,13 @@ class LLMGateway:
         temperature: float = 0.0,
     ) -> LLMResponse:
         effective_max_tokens = max_tokens if max_tokens is not None else self.max_tokens
+        model_name = getattr(self.provider, "model", "")
         fitted_prompt, was_truncated = fit_to_budget(
             prompt=prompt,
             system=system or "",
             budget=self.token_budget,
             reserve_completion_tokens=effective_max_tokens,
+            model=model_name,
         )
         if was_truncated:
             logger.info("Prompt was truncated to fit token budget (%d)", self.token_budget)
