@@ -9,3 +9,5 @@ from app.db.models.file import File as File
 from app.db.models.import_ import Import as Import
 from app.db.models.inheritance import Inheritance as Inheritance
 from app.db.models.repository import Repository as Repository
+from app.db.models.test_case import TestCase as TestCase
+from app.db.models.test_run import TestRun as TestRun

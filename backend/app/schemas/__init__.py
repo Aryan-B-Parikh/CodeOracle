@@ -24,6 +24,14 @@ from app.schemas.summary import (
     RepositorySummaryData,
     SummaryEnvelope,
 )
+from app.schemas.test_run import (
+    FailedTestItem,
+    GenerateTestCodeEnvelope,
+    GenerateTestCodeResponse,
+    TestRunData,
+    TestRunEnvelope,
+    UncoveredLineItem,
+)
 
 __all__ = [
     "AnalysisSummaryPayload",
@@ -36,6 +44,9 @@ __all__ = [
     "ExplanationData",
     "ExplanationEnvelope",
     "ExplanationFields",
+    "FailedTestItem",
+    "GenerateTestCodeEnvelope",
+    "GenerateTestCodeResponse",
     "HighRiskEntity",
     "ImpactData",
     "ImpactEntitySummary",
@@ -44,4 +55,7 @@ __all__ = [
     "ModuleSummaryItem",
     "RepositorySummaryData",
     "SummaryEnvelope",
+    "TestRunData",
+    "TestRunEnvelope",
+    "UncoveredLineItem",
 ]

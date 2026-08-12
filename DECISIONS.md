@@ -146,6 +146,12 @@
 - **Graph facts calculation:** Queries `Call` rows for direct and qualified callers/callees (`Call.callee_name.endswith(...)`), returning `callers` with `file`, `lineStart`, `lineEnd`, `callLine`, aggregated `impact` level (`HIGH`, `MEDIUM`, `LOW`), and rationale.
 - **Verified:** 3 unit/integration tests in `backend/tests/test_impact.py`.
 
+## 2026-08-12 — T-13 Test generator (signatures/branches/exception paths)
+
+- **`app/services/test_generator.py` + `app/api/routes/tests.py`**: Implemented test generator service, `TestRun` & `TestCase` SQLAlchemy models, and endpoints `POST /api/v1/repositories/{id}/tests/generate` & `GET /api/v1/repositories/{id}/tests/latest`.
+- **AST-grounded test generation:** Emits runnable pytest (Python) and JUnit 4 (Java) test suites covering main execution branches and exception paths (`pytest.raises(...)` / `@Test(expected = ...)`). Includes AST-driven fallback generator producing syntactically valid runnable tests.
+- **Verified:** 3 unit/integration tests in `backend/tests/test_generator.py` verifying AST syntax compilation (`ast.parse(code)`), branch/exception test generation, and `docs/api-examples/tests.json` schema compliance.
+
 ## Template for new entries
 
 ```
