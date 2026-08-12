@@ -1,4 +1,5 @@
 import { TestRunEnvelope } from '../types/test_run'
+import { RefactorProposalEnvelope } from '../types/refactor'
 
 const API_BASE = '/api/v1'
 
@@ -25,3 +26,19 @@ export async function triggerGenerateUncovered(
   }
   return res.json()
 }
+
+export async function proposeRefactor(
+  repositoryId: string,
+  entityId: string
+): Promise<RefactorProposalEnvelope> {
+  const url = `${API_BASE}/repositories/${repositoryId}/refactors/${entityId}/propose`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
+  if (!res.ok) {
+    throw new Error(`Failed to propose refactor: status ${res.status}`)
+  }
+  return res.json()
+}
+

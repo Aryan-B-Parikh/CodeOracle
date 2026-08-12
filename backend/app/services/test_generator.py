@@ -59,17 +59,22 @@ def _typed_arg_for_param(param: str) -> str:
     name = token.split(":", 1)[0].split("=", 1)[0].strip().lower()
     source = f"{name} {annotation}"
 
-    if any(key in source for key in ("float", "amount", "rate", "price", "ratio", "pct", "percentage")):
+    _FLOAT_KEYS = ("float", "amount", "rate", "price", "ratio", "pct", "percentage")
+    if any(key in source for key in _FLOAT_KEYS):
         return "1.0"
-    if any(key in source for key in ("int", "count", "n", "limit", "index", "size", "year", "age")):
+    _INT_KEYS = ("int", "count", "n", "limit", "index", "size", "year", "age")
+    if any(key in source for key in _INT_KEYS):
         return "1"
     if any(key in source for key in ("bool", "enabled", "active", "flag", "valid")):
         return "True"
-    if any(key in source for key in ("list", "sequence", "items", "expenses", "rows", "values")):
+    _LIST_KEYS = ("list", "sequence", "items", "expenses", "rows", "values")
+    if any(key in source for key in _LIST_KEYS):
         return "[]"
-    if any(key in source for key in ("dict", "mapping", "config", "expense", "payload", "data", "options")):
+    _DICT_KEYS = ("dict", "mapping", "config", "expense", "payload", "data", "options")
+    if any(key in source for key in _DICT_KEYS):
         return "{}"
-    if any(key in source for key in ("str", "string", "name", "key", "category", "label", "text", "path", "message")):
+    _STR_KEYS = ("str", "string", "name", "key", "category", "label", "text", "path", "message")
+    if any(key in source for key in _STR_KEYS):
         return '"test"'
     return "None"
 
@@ -197,7 +202,8 @@ def generate_unit_tests(
 
     main_lang = _choose_test_language(target_entities, repository)
     functions_info = "\n".join(
-        f"- {e.name} ({e.file.path if e.file else 'unknown'}, lines {e.line_start}-{e.line_end}): signature `{e.signature}`"
+        f"- {e.name} ({e.file.path if e.file else 'unknown'}, "
+        f"lines {e.line_start}-{e.line_end}): signature `{e.signature}`"
         for e in target_entities
     )
     static_facts = "\n".join(
@@ -207,7 +213,11 @@ def generate_unit_tests(
     existing_test_files = [
         f for f in repository.files if "test" in f.path.lower() or "conftest" in f.path.lower()
     ]
-    existing_tests_str = ", ".join(f.path for f in existing_test_files) if existing_test_files else "None"
+    existing_tests_str = (
+        ", ".join(f.path for f in existing_test_files)
+        if existing_test_files
+        else "None"
+    )
 
     try:
         root_dir = repository_root(repository)
@@ -221,8 +231,14 @@ def generate_unit_tests(
             full_path = root_dir / e.file.path
             if full_path.is_file():
                 try:
-                    source_lines = full_path.read_text(encoding="utf-8", errors="replace").splitlines()
-                    func_code = "\n".join(source_lines[max(0, e.line_start - 1) : min(len(source_lines), e.line_end)])
+                    source_lines = full_path.read_text(
+                        encoding="utf-8", errors="replace"
+                    ).splitlines()
+                    func_code = "\n".join(
+                        source_lines[
+                            max(0, e.line_start - 1) : min(len(source_lines), e.line_end)
+                        ]
+                    )
                     snippets.append(f"# {e.file.path}:{e.line_start}\n{func_code}")
                 except Exception:
                     pass
@@ -379,7 +395,9 @@ def generate_uncovered_tests(
 
         uncovered_list = current_run.uncovered_lines or []
         uncovered_str = "\n".join(
-            f"- File: {item.get('file', 'unknown')}, Line: {item.get('line', '?')}, Branch: {item.get('branch', False)}"
+            f"- File: {item.get('file', 'unknown')}, "
+            f"Line: {item.get('line', '?')}, "
+            f"Branch: {item.get('branch', False)}"
             for item in uncovered_list
             if isinstance(item, dict)
         ) or "- All primary lines covered"

@@ -55,7 +55,7 @@
 
 ## Phase 4 — Modernization
 
-- [ ] **T-17** Refactor proposal + diff
+- [x] **T-17** Refactor proposal + diff
   - **AC:** `POST .../refactors/{entity}/propose` returns original vs. proposed code + WHY list; Monaco diff view renders; original repo unchanged (verified by checksum).
 - [ ] **T-18** Breaking-change detection
   - **AC:** Comparing signatures/returns/exceptions/side effects flags changes; output lists impacted callers as `file:line`; correct HIGH/MEDIUM/LOW on crafted fixtures (e.g., changed arg count → HIGH).

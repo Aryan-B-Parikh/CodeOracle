@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react'
 import { TestsTab } from './components/TestsTab'
+import { RefactorTab } from './components/RefactorTab'
 import { TestRunData } from './types/test_run'
-import { fetchLatestTestRun, triggerGenerateUncovered } from './services/api'
+import { RefactorProposal } from './types/refactor'
+import { fetchLatestTestRun, triggerGenerateUncovered, proposeRefactor } from './services/api'
 
 export function App() {
   const [activeTab, setActiveTab] = useState<'overview' | 'architecture' | 'explanations' | 'impact' | 'tests' | 'refactor'>('tests')
   const [repositoryId] = useState<string | null>(null)
   const [testRunData, setTestRunData] = useState<TestRunData | null>(null)
+  const [refactorProposal, setRefactorProposal] = useState<RefactorProposal | null>(null)
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -58,6 +61,26 @@ export function App() {
     }
   }
 
+  const handleProposeRefactor = async (entityId: string) => {
+    if (!repositoryId) return
+    setLoading(true)
+    setErrorMessage(null)
+    setRefactorProposal(null)
+    try {
+      const envelope = await proposeRefactor(repositoryId, entityId)
+      if (envelope.data) {
+        setRefactorProposal(envelope.data)
+      } else if (envelope.error) {
+        setErrorMessage(`Refactor proposal failed: ${envelope.error.message}`)
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setErrorMessage(`Refactor proposal failed: ${msg}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div style={styles.appContainer}>
       <header style={styles.header}>
@@ -100,7 +123,16 @@ export function App() {
           />
         )}
 
-        {activeTab !== 'tests' && (
+        {activeTab === 'refactor' && (
+          <RefactorTab
+            repositoryId={repositoryId || undefined}
+            proposal={refactorProposal}
+            loading={loading}
+            onPropose={repositoryId ? handleProposeRefactor : undefined}
+          />
+        )}
+
+        {activeTab !== 'tests' && activeTab !== 'refactor' && (
           <div style={styles.placeholderTab}>
             <h2>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Tab</h2>
             <p>Content for the {activeTab} section of CodeOracle.</p>
