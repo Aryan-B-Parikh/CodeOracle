@@ -12,10 +12,13 @@ from app.db.models.file import File
 from app.db.models.repository import Repository
 from app.llm import get_llm_gateway
 from app.llm.prompts.repository_summary import (
+    MODULE_SUMMARY_SYSTEM,
+    MODULE_SUMMARY_USER,
     REPOSITORY_SUMMARY_SYSTEM,
     REPOSITORY_SUMMARY_USER,
 )
 from app.llm.security import secure_system_prompt
+from app.schemas.explanation import EvidenceItem
 from app.schemas.summary import (
     AnalysisSummaryPayload,
     ArchIssue,
@@ -24,6 +27,7 @@ from app.schemas.summary import (
     ModuleSummaryItem,
     RepositorySummaryData,
 )
+from app.services.analysis import repository_root
 from app.services.graph import build_graph
 
 logger = logging.getLogger(__name__)
@@ -241,7 +245,7 @@ def generate_repository_summary(
     summary_data = RepositorySummaryData(
         architecture=layers,
         issues=issues,
-                overview=overview_text,
+        overview=overview_text,
     )
 
     payload = AnalysisSummaryPayload(
@@ -270,19 +274,130 @@ def generate_repository_summary(
     return payload
 
 
+def _extract_file_snippet(
+    root_dir: Path, rel_path: str, max_lines: int = 120
+) -> tuple[str, list[str]]:
+    full_path = root_dir / rel_path
+    if not full_path.is_file():
+        return "", []
+    try:
+        lines = full_path.read_text(encoding="utf-8", errors="replace").splitlines()
+        snippet = "\n".join(lines[:max_lines])
+        return snippet, lines
+    except Exception:
+        return "", []
+
+
 def generate_module_summaries(
     db: Session, repository: Repository
 ) -> list[ModuleSummaryItem]:
-    """Generate per-module summaries for files in the repository."""
+    """Generate evidence-backed per-module summaries for files in the repository."""
     items: list[ModuleSummaryItem] = []
+    root_dir = repository_root(repository)
+    llm_gateway = get_llm_gateway()
+
     for file_row in repository.files:
         if "test" in file_row.path.lower() or "conftest" in file_row.path.lower():
             continue
+
         entity_names = [e.name for e in file_row.entities]
-        summary_text = (
-            f"Module {file_row.path} ({file_row.language}, {file_row.loc} LOC) contains "
-            f"{len(entity_names)} entities: {', '.join(entity_names[:5])}."
+        imports_list = [imp.module for imp in file_row.imports]
+        source_snippet, all_lines = _extract_file_snippet(root_dir, file_row.path)
+
+        entities_str = (
+            "\n".join(
+                f"- {e.name} ({e.type}, lines {e.line_start}-{e.line_end})"
+                + (f": {e.docstring}" if e.docstring else "")
+                for e in file_row.entities
+            )
+            or "No top-level entities"
         )
+        imports_str = ", ".join(imports_list) if imports_list else "None"
+
+        user_prompt = MODULE_SUMMARY_USER.format(
+            file=file_row.path,
+            language=file_row.language,
+            loc=file_row.loc,
+            entities_str=entities_str,
+            imports_str=imports_str,
+            source_code=source_snippet or "(Source unavailable)",
+        )
+        system_prompt = secure_system_prompt(MODULE_SUMMARY_SYSTEM)
+
+        purpose: str | None = None
+        responsibilities: list[str] = []
+        dependencies: list[str] = list(imports_list)
+        evidence_items: list[EvidenceItem] = []
+
+        try:
+            res_json = llm_gateway.complete_json(prompt=user_prompt, system=system_prompt)
+            if isinstance(res_json, dict):
+                if isinstance(res_json.get("purpose"), str):
+                    purpose = res_json["purpose"].strip()
+                if isinstance(res_json.get("responsibilities"), list):
+                    responsibilities = [
+                        str(r) for r in res_json["responsibilities"] if isinstance(r, str)
+                    ]
+                if isinstance(res_json.get("dependencies"), list):
+                    dependencies = [
+                        str(d) for d in res_json["dependencies"] if isinstance(d, str)
+                    ]
+                if isinstance(res_json.get("evidence"), list):
+                    for ev in res_json["evidence"]:
+                        if isinstance(ev, dict) and "claim" in ev:
+                            ls_val = ev.get("lineStart") if ev.get("lineStart") is not None else ev.get("line_start", 1)
+                            le_val = ev.get("lineEnd") if ev.get("lineEnd") is not None else ev.get("line_end", 1)
+                            ls_int = int(ls_val) if isinstance(ls_val, (int, float, str)) else 1
+                            le_int = int(le_val) if isinstance(le_val, (int, float, str)) else 1
+                            evidence_items.append(
+                                EvidenceItem(
+                                    claim=str(ev.get("claim", "")),
+                                    file=str(ev.get("file", file_row.path)),
+                                    line_start=ls_int,
+                                    line_end=le_int,
+                                    code=str(ev.get("code", "")),
+                                )
+                            )
+        except Exception as exc:
+            logger.info(
+                "LLM module summary generation skipped/fallback for %s: %s",
+                file_row.path,
+                exc,
+            )
+
+        # Grounded fallback if LLM omitted or failed fields
+        if not purpose:
+            purpose = (
+                f"Provides {len(entity_names)} code entities ({', '.join(entity_names[:3])}) "
+                f"handling {file_row.language} operations."
+            )
+        if not responsibilities:
+            responsibilities = [
+                f"Implements {e.name}" for e in file_row.entities[:5]
+            ] or [f"Defines module structure for {file_row.path}"]
+
+        if not evidence_items:
+            for e in file_row.entities[:3]:
+                snippet_lines = all_lines[
+                    max(0, e.line_start - 1) : min(len(all_lines), e.line_end)
+                ]
+                code_text = (
+                    "\n".join(snippet_lines[:5])
+                    if snippet_lines
+                    else f"def {e.name}(...):"
+                )
+                evidence_items.append(
+                    EvidenceItem(
+                        claim=f"Implements {e.name}",
+                        file=file_row.path,
+                        line_start=e.line_start,
+                        line_end=e.line_end,
+                        code=code_text,
+                    )
+                )
+
+        summary_text = f"{purpose} Responsibilities: {', '.join(responsibilities)}."
+
         items.append(
             ModuleSummaryItem(
                 file=file_row.path,
@@ -290,6 +405,10 @@ def generate_module_summaries(
                 loc=file_row.loc,
                 entity_count=len(file_row.entities),
                 entities=entity_names,
+                purpose=purpose,
+                responsibilities=responsibilities,
+                dependencies=dependencies,
+                evidence=evidence_items,
                 summary=summary_text,
             )
         )

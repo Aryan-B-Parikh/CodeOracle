@@ -136,6 +136,7 @@
 ## 2026-08-12 — T-11 Module & repository summary + architecture classification
 
 - **`app/services/summary.py` + `app/api/routes/summary.py`**: Implemented repository/module summary service and endpoints `GET /api/v1/repositories/{id}/summary` & `GET /api/v1/repositories/{id}/modules/summary`.
+- **Evidence-backed module summaries:** Upgraded module summaries from template baselines to evidence-grounded payloads with `purpose`, `responsibilities`, `dependencies`, and structured `evidence[]` items (`claim`, `file`, `lineStart`, `lineEnd`, `code`) linking back to AST entity line ranges and retrieved source code chunks.
 - **Static graph grounding:** Architecture classification (`Presentation` → `Business Logic` → `Data Access`) and architectural issues (`circular_dependency`, `global_state`, `coupling`) are derived strictly from AST facts and NetworkX module dependency cycles.
 - **Verified:** 4 unit/integration tests in `backend/tests/test_summary.py`.
 

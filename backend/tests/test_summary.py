@@ -107,6 +107,12 @@ def test_module_summaries_endpoint(client: TestClient) -> None:
     tax_mod = next(m for m in modules if m["file"] == "tax.py")
     assert "calculate_tax" in tax_mod["entities"]
     assert tax_mod["entityCount"] >= 2
+    assert "purpose" in tax_mod and tax_mod["purpose"] is not None
+    assert "responsibilities" in tax_mod and len(tax_mod["responsibilities"]) > 0
+    assert "dependencies" in tax_mod
+    assert "evidence" in tax_mod and len(tax_mod["evidence"]) > 0
+    first_ev = tax_mod["evidence"][0]
+    assert "claim" in first_ev and "lineStart" in first_ev and "lineEnd" in first_ev
 
 
 def test_summary_404_not_found(client: TestClient) -> None:

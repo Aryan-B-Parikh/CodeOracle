@@ -3,6 +3,7 @@
 from pydantic import BaseModel, ConfigDict, Field, alias_generators
 
 from app.schemas.common import Envelope
+from app.schemas.explanation import EvidenceItem
 
 
 class ArchLayer(BaseModel):
@@ -67,6 +68,10 @@ class ModuleSummaryItem(BaseModel):
     loc: int = 0
     entity_count: int = 0
     entities: list[str] = Field(default_factory=list)
+    purpose: str | None = None
+    responsibilities: list[str] = Field(default_factory=list)
+    dependencies: list[str] = Field(default_factory=list)
+    evidence: list[EvidenceItem] = Field(default_factory=list)
     summary: str
 
 

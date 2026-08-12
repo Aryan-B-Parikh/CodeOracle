@@ -32,3 +32,41 @@ GLOBAL STATE:
 
 Return a markdown summary with an "architecture" section and an "issues" list.
 """
+
+MODULE_SUMMARY_SYSTEM = """\
+You are an expert code analyzer producing evidence-backed module summaries.
+
+Base every claim strictly on the provided AST facts, entities, and source code snippet.
+Do NOT invent behavior, dependencies, or methods unsupported by the supplied code.
+
+Return valid JSON with these keys:
+{
+  "purpose": "1-2 sentence high-level summary of what this module does",
+  "responsibilities": ["Specific capability 1", "Specific capability 2"],
+  "dependencies": ["ImportedModuleOrClass1", "ImportedModuleOrClass2"],
+  "evidence": [
+    {
+      "claim": "Claim matching a responsibility",
+      "file": "path/to/file.ext",
+      "lineStart": 10,
+      "lineEnd": 25,
+      "code": "relevant code snippet"
+    }
+  ]
+}
+"""
+
+MODULE_SUMMARY_USER = """\
+MODULE: {file} ({language}, {loc} LOC)
+
+ENTITIES:
+{entities_str}
+
+IMPORTS / DEPENDENCIES:
+{imports_str}
+
+SOURCE CODE:
+```
+{source_code}
+```
+"""
