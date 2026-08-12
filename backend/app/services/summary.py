@@ -335,15 +335,13 @@ def generate_module_summaries(
                 if isinstance(res_json.get("evidence"), list):
                     for ev in res_json["evidence"]:
                         if isinstance(ev, dict) and "claim" in ev:
+                            ls_raw = ev.get("lineStart")
+                            le_raw = ev.get("lineEnd")
                             ls_val = (
-                                ev.get("lineStart")
-                                if ev.get("lineStart") is not None
-                                else ev.get("line_start", 1)
+                                ls_raw if ls_raw is not None else ev.get("line_start", 1)
                             )
                             le_val = (
-                                ev.get("lineEnd")
-                                if ev.get("lineEnd") is not None
-                                else ev.get("line_end", 1)
+                                le_raw if le_raw is not None else ev.get("line_end", 1)
                             )
                             ls_int = (
                                 int(ls_val)
@@ -355,6 +353,7 @@ def generate_module_summaries(
                                 if isinstance(le_val, (int, float, str))
                                 else 1
                             )
+>>>>>>> 50effbd (style: line length formatting fix in summary.py)
                             evidence_items.append(
                                 EvidenceItem(
                                     claim=str(ev.get("claim", "")),
