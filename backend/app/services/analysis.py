@@ -22,6 +22,7 @@ from app.analyzers.python_parser import ParsedFile, parse_python
 from app.analyzers.types import ImportRef
 from app.config import get_settings
 from app.db.models.call import Call
+from app.db.models.chunk import Chunk
 from app.db.models.entity import Entity
 from app.db.models.file import File
 from app.db.models.import_ import Import
@@ -181,7 +182,12 @@ def _store_file(
 
 
 def delete_analysis_facts(db: Session, repository_id: uuid.UUID) -> None:
-    """Remove previously persisted graph facts for a repository (re-analysis)."""
+    """Remove all persisted analysis facts before a fresh repository analysis."""
+    # Chunks reference entities through a foreign key, so semantic-index rows
+    # must be removed before the graph entities they reference.
+    db.query(Chunk).filter(Chunk.repository_id == repository_id).delete(
+        synchronize_session=False
+    )
     for model in (Inheritance, Call, Entity):
         db.query(model).filter(model.repository_id == repository_id).delete(
             synchronize_session=False
@@ -200,7 +206,10 @@ def store_parse_results(
     Deterministic: ``(language, path)`` ordering is imposed regardless of the order
     in which parallel workers finished, so the persisted graph never varies.
     """
-    ordered = sorted(results, key=lambda item: (ANALYZED_LANGUAGES.index(item[0]), item[1].path))
+    ordered = sorted(
+        results,
+        key=lambda item: (ANALYZED_LANGUAGES.index(item[0]), item[1].path),
+    )
 
     entity_count = 0
     analyzed_files = 0
@@ -254,4 +263,3 @@ def create_index(db: Session, repository: Repository) -> int:
     from app.index.service import create_index as _create_index
 
     return _create_index(db, repository)
-
