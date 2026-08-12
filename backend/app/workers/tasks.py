@@ -156,6 +156,7 @@ def run_analysis_task(repository_id_raw: str) -> None:
             _aggregate(db, repository, analysis, results)
         except Exception as exc:  # noqa: BLE001
             logger.error("repo=%s aggregation failed: %s", repository_id, exc)
+            db.rollback()
             _fail(repository_id, analysis.id, "aggregating")
             return
         logger.info(
