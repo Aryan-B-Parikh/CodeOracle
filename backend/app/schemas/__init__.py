@@ -7,6 +7,13 @@ from app.schemas.explanation import (
     ExplanationEnvelope,
     ExplanationFields,
 )
+from app.schemas.impact import (
+    CalleeItem,
+    CallerItem,
+    ImpactData,
+    ImpactEntitySummary,
+    ImpactEnvelope,
+)
 from app.schemas.summary import (
     AnalysisSummaryPayload,
     ArchIssue,
@@ -22,12 +29,17 @@ __all__ = [
     "AnalysisSummaryPayload",
     "ArchIssue",
     "ArchLayer",
+    "CalleeItem",
+    "CallerItem",
     "EntitySummary",
     "EvidenceItem",
     "ExplanationData",
     "ExplanationEnvelope",
     "ExplanationFields",
     "HighRiskEntity",
+    "ImpactData",
+    "ImpactEntitySummary",
+    "ImpactEnvelope",
     "ModuleSummaryEnvelope",
     "ModuleSummaryItem",
     "RepositorySummaryData",
