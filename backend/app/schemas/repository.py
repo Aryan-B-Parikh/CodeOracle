@@ -26,6 +26,7 @@ class RepositoryOut(BaseModel):
     file_count: int = 0
     warnings: list[str] = Field(default_factory=list)
     status: str
+    analysis: dict | None = None
     created_at: datetime
     updated_at: datetime
 

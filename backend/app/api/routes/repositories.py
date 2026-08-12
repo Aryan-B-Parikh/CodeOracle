@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
+from app.db.models.analysis import Analysis
 from app.db.models.repository import Repository
 from app.db.session import get_db
 from app.schemas.repository import ImportRequest, RepositoryEnvelope, RepositoryOut
@@ -97,4 +98,13 @@ def get_repository(
     repository = db.get(Repository, repository_id)
     if repository is None:
         raise HTTPException(status_code=404, detail="repository not found")
-    return RepositoryEnvelope(data=RepositoryOut.model_validate(repository))
+    out = RepositoryOut.model_validate(repository)
+    latest_analysis = (
+        db.query(Analysis)
+        .filter(Analysis.repository_id == repository_id)
+        .order_by(Analysis.created_at.desc())
+        .first()
+    )
+    if latest_analysis and latest_analysis.summary:
+        out.analysis = latest_analysis.summary
+    return RepositoryEnvelope(data=out)
