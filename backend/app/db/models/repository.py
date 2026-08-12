@@ -13,6 +13,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
 
 if TYPE_CHECKING:
+    from app.db.models.analysis import Analysis
     from app.db.models.call import Call
     from app.db.models.entity import Entity
     from app.db.models.file import File
@@ -54,5 +55,8 @@ class Repository(Base):
         back_populates="repository", cascade="all, delete-orphan"
     )
     inheritances: Mapped[list[Inheritance]] = relationship(
+        back_populates="repository", cascade="all, delete-orphan"
+    )
+    analyses: Mapped[list[Analysis]] = relationship(
         back_populates="repository", cascade="all, delete-orphan"
     )

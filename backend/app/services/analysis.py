@@ -1,10 +1,20 @@
-"""Repository analysis: run parsers over scanned files and persist graph facts."""
+"""Repository analysis: run parsers over scanned files and persist graph facts.
+
+Two entry points share the same pure parse step and deterministic aggregation:
+
+- ``parse_source`` — parse a single file's source (used directly by Celery worker
+  tasks so files are parsed in parallel, T-07).
+- ``store_parse_results`` — aggregate per-file results into the repository graph
+  facts in a deterministic order (sorted by path), so parallel workers can never
+  produce a different graph than sequential parsing.
+"""
 
 from __future__ import annotations
 
 import uuid
 from pathlib import Path
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.analyzers.java_parser import parse_java
@@ -21,12 +31,23 @@ from app.services.ingestion import collapse_single_top_dir
 
 settings = get_settings()
 
+ANALYZED_LANGUAGES = ("python", "java")
+
 
 def repository_root(repository: Repository) -> Path:
     workdir = settings.upload_dir / str(repository.id)
     if repository.source_type == "zip":
         return collapse_single_top_dir(workdir / "extracted")
     return workdir / "repo"
+
+
+def parse_source(source: str, path: str, language: str) -> ParsedFile | None:
+    """Parse a single file, returning ``None`` when the source is unparseable."""
+    try:
+        parser = parse_python if language == "python" else parse_java
+        return parser(source, path)
+    except SyntaxError:
+        return None
 
 
 def _local_names(files: list[File], language: str) -> set[str]:
@@ -159,32 +180,69 @@ def _store_file(
     _store_calls(db, repository, None, parsed.module_calls, name_to_id)
 
 
-def analyze_repository(db: Session, repository: Repository) -> dict[str, object]:
-    root = repository_root(repository)
+def delete_analysis_facts(db: Session, repository_id: uuid.UUID) -> None:
+    """Remove previously persisted graph facts for a repository (re-analysis)."""
+    for model in (Inheritance, Call, Entity):
+        db.query(model).filter(model.repository_id == repository_id).delete(
+            synchronize_session=False
+        )
+    file_ids = select(File.id).where(File.repository_id == repository_id)
+    db.query(Import).filter(Import.file_id.in_(file_ids)).delete(synchronize_session=False)
+
+
+def store_parse_results(
+    db: Session,
+    repository: Repository,
+    results: list[tuple[str, ParsedFile]],
+) -> dict[str, object]:
+    """Aggregate parsed files into graph facts.
+
+    Deterministic: ``(language, path)`` ordering is imposed regardless of the order
+    in which parallel workers finished, so the persisted graph never varies.
+    """
+    ordered = sorted(results, key=lambda item: (ANALYZED_LANGUAGES.index(item[0]), item[1].path))
+
     entity_count = 0
     analyzed_files = 0
-    counts: dict[str, int] = {}
+    counts: dict[str, int] = {lang: 0 for lang in ANALYZED_LANGUAGES}
 
-    for language, parser in (("python", parse_python), ("java", parse_java)):
-        files = [f for f in repository.files if f.language == language]
-        if not files:
+    files_by_path = {f.path: f for f in repository.files}
+    by_language: dict[str, list[ParsedFile]] = {lang: [] for lang in ANALYZED_LANGUAGES}
+    for language, parsed in ordered:
+        by_language[language].append(parsed)
+        counts[language] += 1
+
+    for language in ANALYZED_LANGUAGES:
+        parsed_list = by_language[language]
+        if not parsed_list:
             continue
-        local_names = _local_names(files, language)
-        for file_row in files:
-            path = root / file_row.path
-            if not path.is_file():
-                continue
-            try:
-                source = path.read_text(encoding="utf-8", errors="replace")
-                parsed = parser(source, file_row.path)
-            except SyntaxError:
+        local_names = _local_names(repository.files, language)
+        for parsed in parsed_list:
+            file_row = files_by_path.get(parsed.path)
+            if file_row is None:
                 continue
             _store_file(db, repository, file_row, parsed, language, local_names)
             entity_count += len(parsed.entities)
             analyzed_files += 1
-        counts[language] = len(files)
 
     repository.entity_count = entity_count
     db.commit()
     return {"entities": entity_count, "files_analyzed": analyzed_files, "languages": counts}
+
+
+def analyze_repository(db: Session, repository: Repository) -> dict[str, object]:
+    """Sequential analysis (single process) using the same primitives as the pipeline."""
+    root = repository_root(repository)
+    results: list[tuple[str, ParsedFile]] = []
+    for language in ANALYZED_LANGUAGES:
+        files = [f for f in repository.files if f.language == language]
+        for file_row in files:
+            path = root / file_row.path
+            if not path.is_file():
+                continue
+            source = path.read_text(encoding="utf-8", errors="replace")
+            parsed = parse_source(source, file_row.path, language)
+            if parsed is not None:
+                results.append((language, parsed))
+    return store_parse_results(db, repository, results)
 

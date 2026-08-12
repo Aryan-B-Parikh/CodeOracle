@@ -110,9 +110,9 @@ Indexes: `(repository_id, name)`, `(file_id)`.
 | id | UUID PK | |
 | repository_id | FK | |
 | status | TEXT | `queued` \| `running` \| `completed` \| `failed` |
-| pipeline_state | JSONB | per-stage progress for live UI |
+| pipeline_state | JSONB | per-stage progress for live UI — camelCase keys: stages `uploaded`/`scanned`/`parsing`/`aggregating`/`graph`, each `{state}` (`pending`/`running`/`done`/`error`); `parsing` also `filesTotal`/`filesParsed` |
 | summary | JSONB | arch classification, issues (circular deps, coupling, global state) |
-| created_at | TIMESTAMPTZ | |
+| created_at / updated_at | TIMESTAMPTZ | |
 
 ### `chunks` + `embeddings` (pgvector)
 | column | type | notes |
@@ -166,6 +166,8 @@ pgvector index: HNSW on `embedding`.
 - `POST /api/v1/repositories/upload` — multipart ZIP → repository id, begins scan.
 - `POST /api/v1/repositories/import` — body `{ "github_url": "..." }`.
 - `GET /api/v1/repositories/{id}` — metadata + status.
+- `POST /api/v1/repositories/{id}/analyze` — creates an `analyses` row (`queued`) and enqueues the Celery pipeline; 409 while an analysis is already `queued`/`running`.
+- `GET /api/v1/repositories/{id}/status` — live pipeline state: `{ repositoryStatus, analysisStatus, currentStage, pipelineState }`; `pipelineState` stages `uploaded`/`scanned`/`parsing`/`aggregating`/`graph` each with `state` (`pending`/`running`/`done`/`error`), parsing also `filesTotal`/`filesParsed`; `currentStage` = first non-done stage or `completed`.
 - `GET /api/v1/repositories/{id}/graph` — nodes/edges for React Flow (`{ nodes: [{id, label, type, complexity, file, lineStart, lineEnd, qualifiedName, riskScore}], edges: [{source, target, kind}] }`); edge `kind` is `contains` \| `call` \| `imports` \| `inherits` \| `implements`; `meta` holds `circularDependencies: [{cycle}]` (module-level) and `highRiskNodeIds` (top 10 by `complexity × (callers + callees + 1)`).
 - `GET /api/v1/repositories/{id}/entities/{entityId}` — entity metadata + AST facts.
 - `GET /api/v1/repositories/{id}/entities/{entityId}/explanation` — structured LLM explanation with `evidence[]` (`{ claim, file, line_start, line_end, code }`).

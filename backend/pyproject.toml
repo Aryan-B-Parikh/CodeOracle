@@ -18,7 +18,7 @@ warn_return_any = true
 exclude = ["tests"]
 
 [[tool.mypy.overrides]]
-module = ["radon", "radon.*", "networkx"]
+module = ["radon", "radon.*", "networkx", "celery", "celery.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

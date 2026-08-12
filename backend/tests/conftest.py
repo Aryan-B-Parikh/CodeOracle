@@ -6,13 +6,14 @@ import tempfile
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 _TEST_UPLOAD_DIR = tempfile.mkdtemp(prefix="codeoracle-tests-")
 os.environ.setdefault("UPLOAD_DIR", _TEST_UPLOAD_DIR)
-
-import pytest  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
+# Run Celery tasks inline (no broker needed); set before any app import.
+os.environ.setdefault("CELERY_TASK_ALWAYS_EAGER", "1")
 
 import app.db.models  # noqa: E402, F401
+import pytest  # noqa: E402
 from app.db.session import Base, engine  # noqa: E402
 from app.main import app  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
 
 
 @pytest.fixture(scope="session", autouse=True)

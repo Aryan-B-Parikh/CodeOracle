@@ -95,6 +95,14 @@
 - **High-risk** = top 10 entities by `complexity × (callers + callees + 1)`, surfaced as `riskScore` per node and `meta.highRiskNodeIds`.
 - Verified: `GET .../graph` on `python_basic` resolves cross-module calls, reports the `[billing.py, database.py]` cycle, and ranks `calculate_invoice` correctly; `java_modern` yields `inherits` edges and all modern type nodes. 56/56 tests.
 
+## 2026-08-12 — T-07 parallel pipeline (Celery)
+
+- **Pipeline driver + fan-out:** `POST /api/v1/repositories/{id}/analyze` (`app/api/routes/pipeline.py`) creates an `analyses` row and enqueues `analysis.run` (`app/workers/tasks.py`), which fans out one `analysis.parse_file` task per file as a Celery `group` — files parse **concurrently on the prefork pool** (tasks are DB-free; they read + parse + return serialized facts). Results are joined with `disable_sync_subtasks=False` (Celery 5.6 blocks `.get()` inside tasks), falling back to inline `.apply()` when `CELERY_TASK_ALWAYS_EAGER=1` (test env, no broker).
+- **Deterministic aggregation:** `store_parse_results` (`app/services/analysis.py`) merges worker results in fixed `(language, path)` order regardless of finish order; `analyze_repository` (sequential, used by tests) and the pipeline share the same primitives. Verified: pipeline output == 2× pipeline == sequential, fact-for-fact (normalized sets of entities/calls/imports/inheritances). Unparseable files skip (recorded), never fail the run; re-analysis deletes prior facts first (`delete_analysis_facts`).
+- **`pipeline_state`** lives on the new `analyses` table (migration `0006_analyses`) and persists every stage transition (`uploaded`/`scanned`/`parsing`/`aggregating`/`graph` with `pending`/`running`/`done`/`error`; parsing also tracks `filesTotal`/`filesParsed`). `GET /api/v1/repositories/{id}/status` reports `repositoryStatus`, `analysisStatus`, `currentStage` (first non-done stage, `completed` when all done). PRD/ADR keep: stage keys JSON use camelCase like all API payloads (nested dicts are not pydantic-aliased).
+- **10K-LOC gate:** synthetic 10K-LOC fixture (100 modules × 5 funcs) analyzes well under the 5-minute bound (`ANALYSIS_TIMEOUT_SECONDS = 300` on the group join; exceeding it fails the analysis and marks `repository.status=failed`).
+- **Ops notes:** run the worker with `celery -A app.workers.celery_app worker --loglevel=info` (docs/05); `analysis.run` blocks one prefork slot while joining the group (`--without-gossip --without-mingle` recommended); `graph` stage is marked done once facts are complete — the NetworkX graph itself is still derived on demand by `GET .../graph` (T-06).
+
 ## Template for new entries
 
 ```
