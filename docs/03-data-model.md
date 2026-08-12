@@ -171,8 +171,10 @@ Indexes: `repository_id`, `file_id`, `entity_id`.
 - `POST /api/v1/repositories/{id}/analyze` — creates an `analyses` row (`queued`) and enqueues the Celery pipeline; 409 while an analysis is already `queued`/`running`.
 - `GET /api/v1/repositories/{id}/status` — live pipeline state: `{ repositoryStatus, analysisStatus, currentStage, pipelineState }`; `pipelineState` stages `uploaded`/`scanned`/`parsing`/`aggregating`/`graph` each with `state` (`pending`/`running`/`done`/`error`), parsing also `filesTotal`/`filesParsed`; `currentStage` = first non-done stage or `completed`.
 - `GET /api/v1/repositories/{id}/graph` — nodes/edges for React Flow (`{ nodes: [{id, label, type, complexity, file, lineStart, lineEnd, qualifiedName, riskScore}], edges: [{source, target, kind}] }`); edge `kind` is `contains` \| `call` \| `imports` \| `inherits` \| `implements`; `meta` holds `circularDependencies: [{cycle}]` (module-level) and `highRiskNodeIds` (top 10 by `complexity × (callers + callees + 1)`).
+- `GET /api/v1/repositories/{id}/summary` — repository overview, architecture classification (Presentation → Business Logic → Data Access), architectural issues (circular deps, global state, coupling), and high-risk entities.
+- `GET /api/v1/repositories/{id}/modules/summary` — per-module entity summaries.
 - `GET /api/v1/repositories/{id}/entities/{entityId}` — entity metadata + AST facts.
-- `GET /api/v1/repositories/{id}/entities/{entityId}/explanation` — structured LLM explanation with `evidence[]` (`{ claim, file, line_start, line_end, code }`).
+- `GET /api/v1/repositories/{id}/entities/{entityId}/explanation` — structured LLM explanation with `evidence[]` (`{ claim, file, lineStart, lineEnd, code }`).
 - `GET /api/v1/repositories/{id}/entities/{entityId}/impact` — callers + impact level.
 - `POST /api/v1/repositories/{id}/tests/generate` — starts test generation job.
 - `GET /api/v1/repositories/{id}/tests/latest` — coverage summary + uncovered lines.
