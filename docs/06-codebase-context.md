@@ -27,10 +27,17 @@ ADRs are short: Context → Decision → Consequences. Append new ones here as d
 - **Consequences:** Clean scope; clear `>60%` coverage story in both languages.
 
 ### ADR-003 — PostgreSQL + pgvector (not FAISS)
-- **Status:** Accepted
+- **Status:** Accepted & Implemented (T-08)
 - **Context:** Need relational metadata + vector search; don't want to operate a second store.
-- **Decision:** Single PostgreSQL 15 DB with pgvector for `chunks.embedding`. HNSW index. FAISS is the documented fallback if pgvector underperforms.
-- **Consequences:** One store to manage; pgvector maturity acceptable for MVP.
+- **Decision:** Single PostgreSQL 15 DB with pgvector for `chunks.embedding`. HNSW index with `vector_cosine_ops`. SQLite test dialect falls back to JSON float list with Python cosine similarity.
+- **Implementation:** 
+  - Migration `0008_pgvector.py` creates vector extension, alters `chunks.embedding` to `vector(N)` type (N from `EMBEDDING_DIMENSIONS`, default 256), creates HNSW index `ix_chunks_embedding_hnsw`
+  - `app/db/models/chunk.py` uses `Vector` type with SQLite JSON fallback via `with_variant(JSON(), "sqlite")`
+  - `app/index/embeddings.py` provides provider-agnostic gateway: local hash embedder (deterministic, for tests) and OpenAI-compatible API embedder (with batching, retries)
+  - `app/index/service.py` uses pgvector's `<=>` cosine distance operator for database-side search; falls back to Python cosine for SQLite
+  - `app/db/models/embedding_cache.py` provides content-addressed caching by (model, dimensions, content_hash)
+- **Configuration:** `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS` (default 256), `EMBEDDING_BATCH_SIZE` (default 64), `EMBEDDING_RETRIES` (default 3), `EMBEDDING_BASE_URL`, `EMBEDDING_CACHE` (default True)
+- **Consequences:** One store to manage; pgvector maturity acceptable for MVP; seamless fallback to JSON for SQLite tests preserves hermetic test suite.
 
 ### ADR-004 — LLM API behind a provider-agnostic gateway (no self-hosted model)
 - **Status:** Accepted

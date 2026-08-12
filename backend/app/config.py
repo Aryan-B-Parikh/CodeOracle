@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     llm_provider: str = "openai"
     llm_model: str = ""
     embedding_model: str = ""
+    embedding_dimensions: int = 256
+    embedding_batch_size: int = 64
+    embedding_retries: int = 3
+    embedding_cache: bool = True
+    embedding_base_url: str = "https://api.openai.com/v1"
     sandbox_image: str = "codeoracle/sandbox:latest"
     sandbox_timeout_seconds: int = 300
     log_level: str = "INFO"

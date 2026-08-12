@@ -1,11 +1,15 @@
 """Provider-agnostic embedding gateway (T-08).
 
 - ``EMBEDDING_MODEL`` unset (default): deterministic local feature-hashing
-  embedder. No network, no API key, stable across runs — ideal for fixtures,
-  dev, and the test suite.
-- ``EMBEDDING_MODEL`` set: OpenAI-compatible ``/embeddings`` API via
-  ``LLM_API_KEY`` (same env surface as the LLM gateway). Both produce
-  L2-normalized vectors so cosine similarity is comparable.
+  embedder — no network, no API key, stable across runs (test suite / dev).
+- ``EMBEDDING_MODEL`` set: OpenAI-compatible ``/embeddings`` API using
+  ``LLM_API_KEY``, ``EMBEDDING_BASE_URL``, with batching
+  (``EMBEDDING_BATCH_SIZE``) and retries (``EMBEDDING_RETRIES``).
+  Calls are content-addressed by ``service.embed_cached`` so unchanged content
+  is never re-sent to the provider.
+
+Both produce L2-normalized vectors so cosine similarity is comparable.
+The dimension is ``EMBEDDING_DIMENSIONS`` (must match the embedder's model).
 """
 
 from __future__ import annotations
@@ -13,11 +17,10 @@ from __future__ import annotations
 import hashlib
 import math
 import re
+import time
 from typing import Protocol
 
 from app.config import get_settings
-
-EMBEDDING_DIMENSIONS = 256
 
 _TOKEN_RE = re.compile(r"[a-zA-Z0-9_]+")
 _CAMEL_RE = re.compile(r"[A-Z]+(?=[A-Z][a-z]|[0-9]|$)|[A-Z]?[a-z]+|[0-9]+")
@@ -44,7 +47,8 @@ def _normalize(vector: list[float]) -> list[float]:
 class HashEmbedder:
     """Feature-hashing embedder: token -> (bucket, sign) over a fixed dimension."""
 
-    dimensions = EMBEDDING_DIMENSIONS
+    def __init__(self, dimensions: int = 256) -> None:
+        self.dimensions = dimensions
 
     def embed(self, text: str) -> list[float]:
         vector = [0.0] * self.dimensions
@@ -60,25 +64,48 @@ class HashEmbedder:
 
 
 class OpenAICompatEmbedder:
-    """Minimal OpenAI-compatible ``/embeddings`` client (used when configured)."""
+    """OpenAI-compatible ``/embeddings`` client with batching and retries."""
 
-    def __init__(self, api_key: str, model: str) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        base_url: str = "https://api.openai.com/v1",
+        batch_size: int = 64,
+        retries: int = 3,
+    ) -> None:
         self.api_key = api_key
         self.model = model
+        self.base_url = base_url.rstrip("/")
+        self.batch_size = batch_size
+        self.retries = retries
 
     def embed_many(self, texts: list[str]) -> list[list[float]]:
+        embeddings: list[list[float]] = []
+        for start in range(0, len(texts), self.batch_size):
+            embeddings.extend(self._embed_batch(texts[start : start + self.batch_size]))
+        return embeddings
+
+    def _embed_batch(self, texts: list[str]) -> list[list[float]]:
         import httpx
 
-        response = httpx.post(
-            "https://api.openai.com/v1/embeddings",
-            headers={"Authorization": f"Bearer {self.api_key}"},
-            json={"model": self.model, "input": texts},
-            timeout=60,
-        )
-        response.raise_for_status()
-        data = response.json()["data"]
-        embeddings = [item["embedding"] for item in sorted(data, key=lambda item: item["index"])]
-        return [_normalize(list(item)) for item in embeddings]
+        url = f"{self.base_url}/embeddings"
+        payload = {"model": self.model, "input": texts}
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+        last_error: Exception | None = None
+        for attempt in range(self.retries + 1):
+            try:
+                response = httpx.post(url, headers=headers, json=payload, timeout=60)
+                response.raise_for_status()
+                data = response.json()["data"]
+                ordered = sorted(data, key=lambda item: item["index"])
+                return [_normalize(list(item["embedding"])) for item in ordered]
+            except (httpx.HTTPError, KeyError, ValueError) as exc:
+                last_error = exc
+                if attempt < self.retries:
+                    time.sleep(0.5 * (2**attempt))  # exponential backoff
+        message = f"embedding request failed after {self.retries + 1} attempts: {last_error}"
+        raise RuntimeError(message) from last_error
 
 
 def get_embedder() -> Embedder:
@@ -86,8 +113,14 @@ def get_embedder() -> Embedder:
     if settings.embedding_model:
         if not settings.llm_api_key:
             raise RuntimeError("EMBEDDING_MODEL set but LLM_API_KEY is empty")
-        return OpenAICompatEmbedder(settings.llm_api_key, settings.embedding_model)
-    return HashEmbedder()
+        return OpenAICompatEmbedder(
+            api_key=settings.llm_api_key,
+            model=settings.embedding_model,
+            base_url=settings.embedding_base_url,
+            batch_size=settings.embedding_batch_size,
+            retries=settings.embedding_retries,
+        )
+    return HashEmbedder(dimensions=settings.embedding_dimensions)
 
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:

@@ -23,6 +23,13 @@
   - **AC:** Files parsed in parallel workers; results aggregate deterministically; `pipeline_state` persists each stage; analysis of a 10K-LOC fixture completes < 5 min; live status endpoint reports correct stage.
 - [x] **T-08** Semantic index
   - **AC:** Module/class/function chunks embedded and stored in pgvector; `GET .../search?q=` returns relevant entities ranked plausibly on fixtures.
+  - **Implementation:**
+    - Smart chunking from persisted static-analysis facts (signature, docstring, arguments, calls, globals, inheritance) — never raw source dumps
+    - Embedding gateway: local deterministic hash embedder (256-dim, L2-normalized, for tests) + production OpenAI-compatible API embedder with batching/retries
+    - PostgreSQL: `chunks.embedding` is `vector(N)` column with HNSW cosine index; SQLite falls back to JSON
+    - Database-side similarity search using pgvector's `<=>` operator; Python cosine fallback for SQLite
+    - Content-addressed embedding cache prevents duplicate API calls
+    - All 72 tests pass (SQLite); pgvector integration tests in `test_pgvector.py` (skipped without PostgreSQL)
 
 ## Phase 2 — AI explanation
 

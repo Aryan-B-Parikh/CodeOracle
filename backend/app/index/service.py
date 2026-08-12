@@ -1,21 +1,26 @@
 """Semantic index: build module/class/function chunks, embed, and search (T-08).
 
-The index is rebuilt deterministically after each analysis run. Search embeds
-the query with the same provider and ranks repository chunks by cosine
-similarity; results carry the entity facts the UI needs to link back into the
-code.
+The index is rebuilt deterministically after each analysis run. Embeddings go
+through a content-addressed cache so API-backed embedders are only called for
+new text. On PostgreSQL the similarity search runs in the database (pgvector
+cosine distance, HNSW-backed); on the SQLite test dialect it falls back to
+Python cosine over the stored JSON vectors with identical result semantics.
 """
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from collections import defaultdict
 from pathlib import Path
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.db.models.call import Call
 from app.db.models.chunk import Chunk
+from app.db.models.embedding_cache import EmbeddingCache
 from app.db.models.entity import Entity
 from app.db.models.file import File
 from app.db.models.import_ import Import
@@ -23,6 +28,8 @@ from app.db.models.inheritance import Inheritance
 from app.db.models.repository import Repository
 from app.index.chunking import entity_chunk_text, level_for, module_chunk_text
 from app.index.embeddings import cosine_similarity, get_embedder
+
+settings = get_settings()
 
 DEFAULT_SEARCH_LIMIT = 10
 MAX_SEARCH_LIMIT = 50
@@ -43,10 +50,75 @@ def _is_test_file(file_row: File) -> bool:
     return any(part in _TEST_PATH_PARTS for part in Path(file_row.path).parts)
 
 
+def _coerce_list(value: object) -> list[float]:
+    """numpy.ndarray (pgvector reader) -> list[float]; JSON list passes through."""
+    if hasattr(value, "tolist"):
+        return list(value.tolist())  # type: ignore[attr-defined]
+    return list(value)  # type: ignore[arg-type]
+
+
+def _content_hash(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
+
+
 def delete_index(db: Session, repository_id: uuid.UUID) -> None:
     db.query(Chunk).filter(Chunk.repository_id == repository_id).delete(
         synchronize_session=False
     )
+
+
+def embed_cached(db: Session, texts: list[str]) -> list[list[float]]:
+    """Content-addressed embedding with fallback to direct embedding when caching
+    is disabled. Persistently cached by (model, dimensions, content hash)."""
+    embedder = get_embedder()
+    if not settings.embedding_cache:
+        return embedder.embed_many(texts)
+
+    hashes = [_content_hash(text) for text in texts]
+    model = settings.embedding_model or "local"
+    dimensions = settings.embedding_dimensions
+
+    by_hash: dict[str, list[float]] = {}
+    rows = (
+        db.query(EmbeddingCache)
+        .filter(
+            EmbeddingCache.model == model,
+            EmbeddingCache.dimensions == dimensions,
+            EmbeddingCache.content_hash.in_(hashes),
+        )
+        .all()
+    )
+    for row in rows:
+        by_hash[row.content_hash] = _coerce_list(row.embedding)
+
+    needed_indices = [i for i, h in enumerate(hashes) if h not in by_hash]
+    missing_vectors = (
+        embedder.embed_many([texts[i] for i in needed_indices]) if needed_indices else []
+    )
+
+    vectors: list[list[float] | None] = [None] * len(hashes)
+    for i, h in enumerate(hashes):
+        if h in by_hash:
+            vectors[i] = by_hash[h]
+
+    for vector, index in zip(missing_vectors, needed_indices, strict=True):
+        vectors[index] = vector
+
+    assert all(v is not None for v in vectors), "embed_cached produced None values"
+
+    new_rows = [
+        EmbeddingCache(
+            model=model,
+            dimensions=dimensions,
+            content_hash=hashes[index],
+            embedding=vector,
+        )
+        for index, vector in zip(needed_indices, missing_vectors, strict=True)
+    ]
+    if new_rows:
+        db.add_all(new_rows)
+        db.commit()
+    return vectors
 
 
 def create_index(db: Session, repository: Repository) -> int:
@@ -65,7 +137,9 @@ def create_index(db: Session, repository: Repository) -> int:
             inheritances_by_entity[str(edge.entity_id)].append(edge)
 
     imports_by_file: dict[str, list[Import]] = defaultdict(list)
-    for imported in db.query(Import).filter(Import.file_id.in_([f.id for f in repository.files])):
+    for imported in db.query(Import).filter(
+        Import.file_id.in_([f.id for f in repository.files])
+    ):
         imports_by_file[str(imported.file_id)].append(imported)
 
     chunks: list[Chunk] = []
@@ -106,8 +180,7 @@ def create_index(db: Session, repository: Repository) -> int:
             )
             texts.append(text)
 
-    embedder = get_embedder()
-    vectors = embedder.embed_many(texts)
+    vectors = embed_cached(db, texts)
     for chunk, vector in zip(chunks, vectors, strict=True):
         chunk.embedding = vector
 
@@ -122,15 +195,55 @@ def search(
     query: str,
     limit: int = DEFAULT_SEARCH_LIMIT,
 ) -> list[dict[str, object]]:
-    embedder = get_embedder()
-    query_vector = embedder.embed_many([query])[0]
+    query_vector = embed_cached(db, [query])[0]
+    if db.get_bind().dialect.name == "postgresql":
+        scored = _database_search(db, repository, query_vector, limit)
+    else:
+        scored = _python_search(db, repository, query_vector)
+    return _build_results(db, repository, scored, limit)
 
+
+def _python_search(
+    db: Session,
+    repository: Repository,
+    query_vector: list[float],
+) -> list[tuple[float, Chunk]]:
     scored: list[tuple[float, Chunk]] = []
     for chunk in db.query(Chunk).filter(Chunk.repository_id == repository.id):
         if not chunk.embedding:
             continue
-        scored.append((cosine_similarity(query_vector, chunk.embedding), chunk))
+        scored.append(
+            (cosine_similarity(query_vector, _coerce_list(chunk.embedding)), chunk)
+        )
+    return scored
 
+
+def _database_search(
+    db: Session,
+    repository: Repository,
+    query_vector: list[float],
+    limit: int,
+) -> list[tuple[float, Chunk]]:
+    """pgvector cosine distance (``<=>``) evaluated inside PostgreSQL, HNSW-backed."""
+    distance = Chunk.embedding.cosine_distance(query_vector).label("distance")
+    rows = (
+        db.execute(
+            select(Chunk, distance)
+            .where(Chunk.repository_id == repository.id)
+            .order_by(distance.asc())
+            .limit(limit)
+        )
+        .all()
+    )
+    return [(1.0 - float(row.distance), row.Chunk) for row in rows]
+
+
+def _build_results(
+    db: Session,
+    repository: Repository,
+    scored: list[tuple[float, Chunk]],
+    limit: int,
+) -> list[dict[str, object]]:
     scored.sort(key=lambda item: (-item[0], item[1].qualified_name or ""))
 
     entity_by_id = {

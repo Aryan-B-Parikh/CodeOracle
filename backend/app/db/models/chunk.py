@@ -1,9 +1,10 @@
 """Semantic chunk table model (T-08 vector index).
 
-Stores module/class/function level chunks with their embedding as a JSON list
-of floats (JSONVariant -> real ``vector`` column on Postgres is the documented
-pgvector upgrade path; see DECISIONS.md). The embedding dimension is an
-application concern; search computes cosine similarity in Python for now.
+Stores module/class/function-level chunks with their embedding in a real
+Postgres ``vector(N)`` column (pgvector) with an HNSW cosine index; the SQLite
+test dialect falls back to a JSON float list. The dimension is application
+configuration (``EMBEDDING_DIMENSIONS``). Search runs in the database on
+Postgres and in Python on SQLite.
 """
 
 from __future__ import annotations
@@ -12,10 +13,11 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import JSON, DateTime, ForeignKey, String, Text, Uuid
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.config import get_settings
 from app.db.session import Base
 
 if TYPE_CHECKING:
@@ -23,7 +25,8 @@ if TYPE_CHECKING:
     from app.db.models.file import File
     from app.db.models.repository import Repository
 
-JSONVariant = JSONB().with_variant(JSON(), "sqlite")
+_settings = get_settings()
+_VECTOR = Vector(_settings.embedding_dimensions).with_variant(JSON(), "sqlite")
 
 
 def _utcnow() -> datetime:
@@ -46,7 +49,7 @@ class Chunk(Base):
     level: Mapped[str] = mapped_column(String(16), nullable=False)
     qualified_name: Mapped[str | None] = mapped_column(String(500))
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    embedding: Mapped[list] = mapped_column(JSONVariant, default=list)
+    embedding: Mapped[list] = mapped_column(_VECTOR, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     repository: Mapped[Repository] = relationship(back_populates="chunks")

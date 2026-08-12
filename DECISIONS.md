@@ -106,11 +106,13 @@
 ## 2026-08-12 — T-08 semantic index
 
 - **`app/index/`** = chunking + embeddings + search. `chunking.py` builds module/class/function chunks **from persisted facts** (signature, docstring, arguments, calls, globals, inheritance) — never raw source dumps, so the index feeds the LLM retrieval layer the same ground truth.
-- **Embedding gateway** (`embeddings.py`): provider-agnostic. With `EMBEDDING_MODEL` unset it uses a **deterministic local feature-hashing embedder** (256-dim, L2-normalized) — no network/key, stable across runs, which keeps the test suite hermetic; when set, it calls the OpenAI-compatible `/embeddings` API via `LLM_API_KEY`. Both produce comparable cosine scores.
+- **Embedding gateway** (`embeddings.py`): provider-agnostic. With `EMBEDDING_MODEL` unset it uses a **deterministic local feature-hashing embedder** (256-dim, L2-normalized) — no network/key, stable across runs, which keeps the test suite hermetic; when set, it calls the OpenAI-compatible `/embeddings` API via `LLM_API_KEY` with batching (`EMBEDDING_BATCH_SIZE`) and retries (`EMBEDDING_RETRIES`). Both produce comparable cosine scores.
 - **Search endpoint** `GET /api/v1/repositories/{id}/search?q=` returns ranked results with `entityId`, `qualifiedName`, `file`, `type`, `level`, line range, `score`. Test/`conftest` sources are excluded from the index so entity ranking stays clean on fixtures.
 - **Pipeline wiring**: new `index` stage appended to `PIPELINE_STAGES`; `tasks._aggregate` builds the index after graph facts, and the sequential `analyze_repository` path builds it too.
-- **pgvector note (deviation):** AC says "stored in pgvector", but tests run on sqlite and no PG server exists here, so `chunks.embedding` is JSONVariant (JSON float list) with cosine search computed in Python. The pgvector `vector(...)` column + HNSW remains the documented production upgrade (one migration + a search branch swap); see ADR-003.
-- Verified: `calculate tax` → `calculate_tax` is the top-ranked entity; `invoice discount customer` → billing logic; `data layer…` → `database.py` fetch/connection; Java `payment charge` → `PaymentService.charge`. 72/72 tests.
+- **pgvector implementation (production):** Migration `0008_pgvector.py` creates the vector extension, alters `chunks.embedding` to `vector(N)` type (N from `EMBEDDING_DIMENSIONS`), and creates HNSW index `ix_chunks_embedding_hnsw` with `vector_cosine_ops`. Database-side similarity search uses pgvector's `<=>` cosine distance operator via SQLAlchemy's `cosine_distance()` method. SQLite test dialect uses JSON float list with Python cosine fallback (identical semantics).
+- **Embedding cache:** Content-addressed by (model, dimensions, content_hash) in `embedding_cache` table; API-backed embedder only invoked for new content.
+- **Configuration:** `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS` (default 256), `EMBEDDING_BATCH_SIZE` (default 64), `EMBEDDING_RETRIES` (default 3), `EMBEDDING_BASE_URL`, `EMBEDDING_CACHE` (default True).
+- Verified: `calculate tax` → `calculate_tax` is the top-ranked entity; `invoice discount customer` → billing logic; `data layer…` → `database.py` fetch/connection; Java `payment charge` → `PaymentService.charge`. 72/72 tests pass on SQLite. PostgreSQL/pgvector integration tests added in `test_pgvector.py` (auto-skipped without PG).
 
 ## Template for new entries
 
