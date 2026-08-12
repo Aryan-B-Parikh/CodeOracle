@@ -26,6 +26,8 @@ def _requires_postgresql() -> None:
 
 @pytest.fixture(scope="module", autouse=True)
 def _ensure_schema() -> None:
+    if engine.dialect.name != "postgresql":
+        return
     with engine.begin() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     Base.metadata.create_all(engine)

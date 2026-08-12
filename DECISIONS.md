@@ -125,7 +125,13 @@
 - **Token budget management:** `estimate_tokens` (~4 chars per token rule of thumb) and `fit_to_budget` truncate long prompts from the tail while strictly preserving system instructions and reserving completion tokens (`llm_max_tokens`). `TokenBudgetExceededError` raised if system prompt alone exceeds available budget.
 - **Retry & error handling:** Retries transient network and HTTP 5xx/429 errors using exponential backoff up to `llm_retries`. Non-retryable authentication failures (HTTP 401/403) raise `LLAuthenticationError` immediately without unnecessary retry attempts.
 - **JSON completion helper:** `LLMGateway.complete_json()` provides resilient JSON parsing with support for markdown code block extraction (` ```json ... ``` `) and embedded JSON strings.
-- **Verified:** 14 unit tests in `backend/tests/test_llm_gateway.py` covering mock provider, OpenAI HTTP mocking, Anthropic HTTP mocking, auth error handling, exponential backoff retries, token budget calculation, truncation, and JSON parsing.
+## 2026-08-12 — T-10 Evidence-cited function explanation
+
+- **`app/services/explanation.py` + `app/api/routes/entities.py`**: Implemented function explanation service and `GET /api/v1/repositories/{id}/entities/{entityId}/explanation` API route.
+- **Contract compliance:** Guarantees all 10 structured fields (`purpose`, `inputs`, `outputs`, `sideEffects`, `dependencies`, `controlFlow`, `errorHandling`, `businessRules`, `complexity`, `risks`) and `evidence[]` array with `claim`, `file`, `lineStart`, `lineEnd`, `code`.
+- **Static analysis grounding:** Retrieves entity source snippet via `repository_root(repository)`, AST facts (signature, docstring, parameters, return type, CCN complexity, imports, globals), caller entities (`called_by`), and callee entities (`calls`).
+- **Prompt security:** Uses `secure_system_prompt(EXPLANATION_SYSTEM)` from `app.llm.security` to enforce untrusted source data trust boundaries.
+- **Verified:** 3 unit/integration tests in `backend/tests/test_explanation.py` verifying response schema, 10 fields, evidence citations, and 404 handling.
 
 ## Template for new entries
 

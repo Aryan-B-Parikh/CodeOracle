@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app import __version__
+from app.api.routes.entities import router as entities_router
 from app.api.routes.graph import router as graph_router
 from app.api.routes.health import router as health_router
 from app.api.routes.pipeline import router as pipeline_router
@@ -13,4 +14,5 @@ app.include_router(health_router, prefix="/api/v1")
 app.include_router(repositories_router, prefix="/api/v1")
 app.include_router(pipeline_router, prefix="/api/v1")
 app.include_router(graph_router, prefix="/api/v1")
+app.include_router(entities_router, prefix="/api/v1")
 app.include_router(search_router, prefix="/api/v1")

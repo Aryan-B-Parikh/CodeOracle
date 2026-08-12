@@ -35,7 +35,7 @@
 
 - [x] **T-09** LLM gateway
   - **AC:** `llm/` gateway wraps provider; `LLM_PROVIDER`/`LLM_MODEL` env-driven; token budget + retry handling; unit-tested with a mock provider.
-- [ ] **T-10** Evidence-cited function explanation
+- [x] **T-10** Evidence-cited function explanation
   - **AC:** Response has the 10 fields (purpose, inputs, outputs, side effects, dependencies, control flow, error handling, business rules, complexity, risks) and `evidence[]` with `file`, `line_start/end`, `code`; spot-check: claims trace to actual fixture code.
 - [ ] **T-11** Module & repository summary + architecture classification
   - **AC:** Summaries reference real entities; architecture classified (Presentation → Business Logic → Data Access → DB) with issues (coupling, circular deps, global config) derived from the graph, not the LLM.
