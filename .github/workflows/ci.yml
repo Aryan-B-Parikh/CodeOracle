@@ -9,6 +9,23 @@ jobs:
   backend:
     name: Backend quality gates
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: codeoracle
+          POSTGRES_PASSWORD: codeoracle
+          POSTGRES_DB: codeoracle
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U codeoracle -d codeoracle"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+psycopg://codeoracle:codeoracle@localhost:5432/codeoracle
+      EMBEDDING_DIMENSIONS: "256"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -23,15 +40,17 @@ jobs:
       - name: Typecheck (mypy)
         working-directory: backend
         run: mypy app
+      - name: Apply PostgreSQL migrations
+        working-directory: backend
+        run: alembic upgrade head
       - name: Tests (pytest)
         run: pytest backend/tests
+      - name: PostgreSQL + pgvector integration tests
+        run: pytest backend/tests/test_pgvector.py -q
 
   frontend:
     name: Frontend quality gates
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
