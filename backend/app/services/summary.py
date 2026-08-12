@@ -56,7 +56,9 @@ def classify_architecture(files: list[File]) -> list[ArchLayer]:
         ):
             presentation.append(f.path)
         elif (
-            stem in ("database", "db", "dao", "models", "storage", "connection", "repository")
+            stem in (
+                "database", "db", "dao", "models", "storage", "connection", "repository"
+            )
             or any(
                 part in p_lower
                 for part in ("db/", "models/", "dao/", "storage/", "repository/")
@@ -83,7 +85,6 @@ def detect_architectural_issues(
     """Derive architectural issues strictly from the knowledge graph and AST facts."""
     issues: list[ArchIssue] = []
 
-    # 1. Circular dependencies
     graph_data = build_graph(db, repository)
     meta = graph_data.get("meta", {})
     circular_list = meta.get("circular_dependencies", []) if isinstance(meta, dict) else []
@@ -100,7 +101,6 @@ def detect_architectural_issues(
                     )
                 )
 
-    # 2. Global state usage
     global_vars: set[str] = set()
     for entity in repository.entities:
         if entity.metadata_json:
@@ -112,14 +112,9 @@ def detect_architectural_issues(
 
     for g_var in sorted(global_vars)[:5]:
         issues.append(
-            ArchIssue(
-                kind="global_state",
-                detail=g_var,
-                severity="medium",
-            )
+            ArchIssue(kind="global_state", detail=g_var, severity="medium")
         )
 
-    # 3. High complexity / coupling
     for entity in repository.entities:
         if entity.complexity >= 8:
             mod_name = Path(entity.file.path if entity.file else "module").name
@@ -128,11 +123,7 @@ def detect_architectural_issues(
                 f"complexity ({entity.complexity})"
             )
             issues.append(
-                ArchIssue(
-                    kind="coupling",
-                    detail=detail,
-                    severity="medium",
-                )
+                ArchIssue(kind="coupling", detail=detail, severity="medium")
             )
             if len(issues) >= 10:
                 break
@@ -253,7 +244,6 @@ def generate_repository_summary(
         high_risk_entities=high_risk,
     )
 
-    # Persist summary to the latest Analysis record (or create one)
     latest_analysis = (
         db.query(Analysis)
         .filter(Analysis.repository_id == repository.id)
@@ -345,10 +335,26 @@ def generate_module_summaries(
                 if isinstance(res_json.get("evidence"), list):
                     for ev in res_json["evidence"]:
                         if isinstance(ev, dict) and "claim" in ev:
-                            ls_val = ev.get("lineStart") if ev.get("lineStart") is not None else ev.get("line_start", 1)
-                            le_val = ev.get("lineEnd") if ev.get("lineEnd") is not None else ev.get("line_end", 1)
-                            ls_int = int(ls_val) if isinstance(ls_val, (int, float, str)) else 1
-                            le_int = int(le_val) if isinstance(le_val, (int, float, str)) else 1
+                            ls_val = (
+                                ev.get("lineStart")
+                                if ev.get("lineStart") is not None
+                                else ev.get("line_start", 1)
+                            )
+                            le_val = (
+                                ev.get("lineEnd")
+                                if ev.get("lineEnd") is not None
+                                else ev.get("line_end", 1)
+                            )
+                            ls_int = (
+                                int(ls_val)
+                                if isinstance(ls_val, (int, float, str))
+                                else 1
+                            )
+                            le_int = (
+                                int(le_val)
+                                if isinstance(le_val, (int, float, str))
+                                else 1
+                            )
                             evidence_items.append(
                                 EvidenceItem(
                                     claim=str(ev.get("claim", "")),
@@ -365,16 +371,15 @@ def generate_module_summaries(
                 exc,
             )
 
-        # Grounded fallback if LLM omitted or failed fields
         if not purpose:
             purpose = (
                 f"Provides {len(entity_names)} code entities ({', '.join(entity_names[:3])}) "
                 f"handling {file_row.language} operations."
             )
         if not responsibilities:
-            responsibilities = [
-                f"Implements {e.name}" for e in file_row.entities[:5]
-            ] or [f"Defines module structure for {file_row.path}"]
+            responsibilities = [f"Implements {e.name}" for e in file_row.entities[:5]] or [
+                f"Defines module structure for {file_row.path}"
+            ]
 
         if not evidence_items:
             for e in file_row.entities[:3]:
