@@ -114,6 +114,19 @@
 - **Configuration:** `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS` (default 256), `EMBEDDING_BATCH_SIZE` (default 64), `EMBEDDING_RETRIES` (default 3), `EMBEDDING_BASE_URL`, `EMBEDDING_CACHE` (default True).
 - Verified: `calculate tax` → `calculate_tax` is the top-ranked entity; `invoice discount customer` → billing logic; `data layer…` → `database.py` fetch/connection; Java `payment charge` → `PaymentService.charge`. 72/72 tests pass on SQLite. PostgreSQL/pgvector integration tests added in `test_pgvector.py` (auto-skipped without PG).
 
+## 2026-08-12 — T-09 LLM gateway
+
+- **`app/llm/gateway.py`** = provider-agnostic LLM gateway wrapping LLM provider APIs (`openai`, `anthropic`, `mock`).
+- **Env-driven provider configuration:** Driven by `LLM_PROVIDER` and `LLM_MODEL` in application settings (`config.py`). Provider selection defaults to `MockLLMProvider` when `LLM_PROVIDER="mock"` or when `LLM_API_KEY` is omitted, guaranteeing zero external network calls in unit testing and local development.
+- **Provider abstraction:** Provider Protocol defines `complete(prompt, system, max_tokens, temperature)` returning typed `LLMResponse` (with prompt/completion/total token metadata, finish reason, and raw payload). Supported providers:
+  - `MockLLMProvider`: In-memory mock supporting canned responses, history inspection, and simulated transient retry errors.
+  - `OpenAIProvider`: Calls OpenAI-compatible `/chat/completions` API via `httpx` with exponential backoff retries.
+  - `AnthropicProvider`: Calls Anthropic `/v1/messages` API via `httpx` with exponential backoff retries.
+- **Token budget management:** `estimate_tokens` (~4 chars per token rule of thumb) and `fit_to_budget` truncate long prompts from the tail while strictly preserving system instructions and reserving completion tokens (`llm_max_tokens`). `TokenBudgetExceededError` raised if system prompt alone exceeds available budget.
+- **Retry & error handling:** Retries transient network and HTTP 5xx/429 errors using exponential backoff up to `llm_retries`. Non-retryable authentication failures (HTTP 401/403) raise `LLAuthenticationError` immediately without unnecessary retry attempts.
+- **JSON completion helper:** `LLMGateway.complete_json()` provides resilient JSON parsing with support for markdown code block extraction (` ```json ... ``` `) and embedded JSON strings.
+- **Verified:** 14 unit tests in `backend/tests/test_llm_gateway.py` covering mock provider, OpenAI HTTP mocking, Anthropic HTTP mocking, auth error handling, exponential backoff retries, token budget calculation, truncation, and JSON parsing.
+
 ## Template for new entries
 
 ```
@@ -123,3 +136,4 @@
 - **Replaces:** <option/decision superseded, if any>
 - **Notes:** <consequences, follow-ups>
 ```
+

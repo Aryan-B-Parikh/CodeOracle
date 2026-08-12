@@ -33,7 +33,7 @@
 
 ## Phase 2 — AI explanation
 
-- [ ] **T-09** LLM gateway
+- [x] **T-09** LLM gateway
   - **AC:** `llm/` gateway wraps provider; `LLM_PROVIDER`/`LLM_MODEL` env-driven; token budget + retry handling; unit-tested with a mock provider.
 - [ ] **T-10** Evidence-cited function explanation
   - **AC:** Response has the 10 fields (purpose, inputs, outputs, side effects, dependencies, control flow, error handling, business rules, complexity, risks) and `evidence[]` with `file`, `line_start/end`, `code`; spot-check: claims trace to actual fixture code.

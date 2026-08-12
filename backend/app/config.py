@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_provider: str = "openai"
     llm_model: str = ""
+    llm_base_url: str = "https://api.openai.com/v1"
+    llm_max_tokens: int = 2048
+    llm_token_budget: int = 8192
+    llm_retries: int = 3
+    llm_timeout_seconds: float = 60.0
     embedding_model: str = ""
     embedding_dimensions: int = 256
     embedding_batch_size: int = 64
