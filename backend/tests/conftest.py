@@ -1,4 +1,4 @@
-"""Test environment: sqlite in-memory DB + temp upload dir, set before app import."""
+"""Test environment: isolated DB + temp upload dir, set before app import."""
 
 import os
 import tempfile
@@ -6,7 +6,6 @@ import tempfile
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 _TEST_UPLOAD_DIR = tempfile.mkdtemp(prefix="codeoracle-tests-")
 os.environ.setdefault("UPLOAD_DIR", _TEST_UPLOAD_DIR)
-# Run Celery tasks inline (no broker needed); set before any app import.
 os.environ.setdefault("CELERY_TASK_ALWAYS_EAGER", "1")
 
 import app.db.models  # noqa: E402, F401
@@ -18,8 +17,15 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 @pytest.fixture(scope="session", autouse=True)
 def _schema() -> None:
-    Base.metadata.drop_all(engine)
-    Base.metadata.create_all(engine)
+    """Prepare local SQLite schema without destroying CI's migrated PostgreSQL schema.
+
+    CI runs Alembic against PostgreSQL before pytest. Keeping that schema intact
+    ensures migration-owned objects such as the pgvector HNSW index are tested
+    exactly as production creates them.
+    """
+    if engine.dialect.name == "sqlite":
+        Base.metadata.drop_all(engine)
+        Base.metadata.create_all(engine)
 
 
 @pytest.fixture()
