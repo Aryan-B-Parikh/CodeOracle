@@ -244,5 +244,14 @@ def analyze_repository(db: Session, repository: Repository) -> dict[str, object]
             parsed = parse_source(source, file_row.path, language)
             if parsed is not None:
                 results.append((language, parsed))
-    return store_parse_results(db, repository, results)
+    stats = store_parse_results(db, repository, results)
+    create_index(db, repository)
+    return stats
+
+
+def create_index(db: Session, repository: Repository) -> int:
+    """Build the semantic index (T-08); returns chunk count."""
+    from app.index.service import create_index as _create_index
+
+    return _create_index(db, repository)
 

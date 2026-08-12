@@ -21,7 +21,7 @@
   - **AC:** Repository→package→module→class→function→call graph correct on fixtures; circular-dependency detection; high-risk nodes (high complexity × many callers) computed; `GET .../graph` returns React Flow `nodes`/`edges`.
 - [x] **T-07** Parallel pipeline (Celery)
   - **AC:** Files parsed in parallel workers; results aggregate deterministically; `pipeline_state` persists each stage; analysis of a 10K-LOC fixture completes < 5 min; live status endpoint reports correct stage.
-- [ ] **T-08** Semantic index
+- [x] **T-08** Semantic index
   - **AC:** Module/class/function chunks embedded and stored in pgvector; `GET .../search?q=` returns relevant entities ranked plausibly on fixtures.
 
 ## Phase 2 — AI explanation

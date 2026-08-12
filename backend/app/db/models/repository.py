@@ -15,6 +15,7 @@ from app.db.session import Base
 if TYPE_CHECKING:
     from app.db.models.analysis import Analysis
     from app.db.models.call import Call
+    from app.db.models.chunk import Chunk
     from app.db.models.entity import Entity
     from app.db.models.file import File
     from app.db.models.inheritance import Inheritance
@@ -55,6 +56,9 @@ class Repository(Base):
         back_populates="repository", cascade="all, delete-orphan"
     )
     inheritances: Mapped[list[Inheritance]] = relationship(
+        back_populates="repository", cascade="all, delete-orphan"
+    )
+    chunks: Mapped[list[Chunk]] = relationship(
         back_populates="repository", cascade="all, delete-orphan"
     )
     analyses: Mapped[list[Analysis]] = relationship(

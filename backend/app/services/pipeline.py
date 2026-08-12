@@ -17,7 +17,7 @@ from app.db.models.analysis import Analysis
 from app.db.models.repository import Repository
 from app.services.analysis import ANALYZED_LANGUAGES
 
-PIPELINE_STAGES = ("uploaded", "scanned", "parsing", "aggregating", "graph")
+PIPELINE_STAGES = ("uploaded", "scanned", "parsing", "aggregating", "graph", "index")
 
 STAGE_PENDING = "pending"
 STAGE_RUNNING = "running"

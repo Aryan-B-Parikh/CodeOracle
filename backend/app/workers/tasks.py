@@ -182,6 +182,7 @@ def _aggregate(
     set_stage(db, analysis, "graph", STAGE_DONE)
     analysis.status = "completed"
     db.commit()
+    _index(db, repository, analysis)
     db.refresh(repository)
     logger.info(
         "repo=%s aggregate entities=%d files=%d",
@@ -189,6 +190,22 @@ def _aggregate(
         stats["entities"],
         stats["files_analyzed"],
     )
+
+
+def _index(db: Session, repository: Repository, analysis: Analysis) -> None:
+    """Build the semantic index after graph facts exist (T-08)."""
+    from app.index.service import create_index
+
+    set_stage(db, analysis, "index", STAGE_RUNNING)
+    try:
+        chunks = create_index(db, repository)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("repo=%s index stage failed: %s", repository.id, exc)
+        _fail(repository.id, analysis.id, "index")
+        return
+    set_stage(db, analysis, "index", STAGE_DONE, chunks=chunks)
+    analysis.status = "completed"
+    db.commit()
 
 
 def _fail(repository_id: uuid.UUID, analysis_id: uuid.UUID, stage: str) -> None:

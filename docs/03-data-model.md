@@ -114,17 +114,19 @@ Indexes: `(repository_id, name)`, `(file_id)`.
 | summary | JSONB | arch classification, issues (circular deps, coupling, global state) |
 | created_at / updated_at | TIMESTAMPTZ | |
 
-### `chunks` + `embeddings` (pgvector)
+### `chunks` (semantic index rows)
 | column | type | notes |
 |---|---|---|
 | id | UUID PK | |
 | repository_id | FK | |
+| file_id | FK | |
 | entity_id | FK NULL | nullable for module-level chunks |
 | level | TEXT | `module` \| `class` \| `function` |
-| content | TEXT | the chunk text |
-| embedding | vector(1536) | configurable dims |
+| qualified_name | TEXT NULL | entity qualified name (module chunks → NULL) |
+| content | TEXT | chunk text (facts-based: signature, docstring, calls, globals, inheritance) |
+| embedding | JSONB | MVP stores the vector as a JSON float list; pgvector `vector(...)` + HNSW is the documented upgrade path |
 
-pgvector index: HNSW on `embedding`.
+Indexes: `repository_id`, `file_id`, `entity_id`.
 
 ### `test_runs`
 | column | type | notes |
@@ -177,7 +179,7 @@ pgvector index: HNSW on `embedding`.
 - `POST /api/v1/repositories/{id}/tests/generate-uncovered` — targeted iteration.
 - `POST /api/v1/repositories/{id}/refactors/{entityId}/propose` — LLM + static diff → proposal.
 - `GET /api/v1/repositories/{id}/refactors` — list proposals + safety scores.
-- `GET /api/v1/repositories/{id}/search?q=...` — semantic search (pgvector).
+- `GET /api/v1/repositories/{id}/search?q=...` — semantic search; ranked `results` (`{ query, results: [{entityId, qualifiedName, file, type, level, lineStart, lineEnd, score}] }`).
 
 Shared envelope: `{ "data": ..., "error": null }`; errors: `{ "data": null, "error": { "code": "...", "message": "..." } }`.
 

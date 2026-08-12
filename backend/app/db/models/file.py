@@ -12,6 +12,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
 
 if TYPE_CHECKING:
+    from app.db.models.chunk import Chunk
     from app.db.models.entity import Entity
     from app.db.models.import_ import Import
     from app.db.models.repository import Repository
@@ -42,5 +43,8 @@ class File(Base):
         back_populates="file", cascade="all, delete-orphan"
     )
     imports: Mapped[list[Import]] = relationship(
+        back_populates="file", cascade="all, delete-orphan"
+    )
+    chunks: Mapped[list[Chunk]] = relationship(
         back_populates="file", cascade="all, delete-orphan"
     )

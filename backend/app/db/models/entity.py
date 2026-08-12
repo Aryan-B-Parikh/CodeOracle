@@ -14,6 +14,7 @@ from app.db.session import Base
 
 if TYPE_CHECKING:
     from app.db.models.call import Call
+    from app.db.models.chunk import Chunk
     from app.db.models.file import File
     from app.db.models.inheritance import Inheritance
     from app.db.models.repository import Repository
@@ -62,4 +63,7 @@ class Entity(Base):
     )
     inherits: Mapped[list[Inheritance]] = relationship(
         back_populates="entity", foreign_keys="Inheritance.entity_id"
+    )
+    chunks: Mapped[list[Chunk]] = relationship(
+        back_populates="entity", cascade="all, delete-orphan"
     )

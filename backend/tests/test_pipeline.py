@@ -134,7 +134,7 @@ def test_status_reports_stages_and_completion(client: TestClient) -> None:
     assert body["currentStage"] == "completed"
 
     stages = body["pipelineState"]
-    for stage in ("uploaded", "scanned", "parsing", "aggregating", "graph"):
+    for stage in ("uploaded", "scanned", "parsing", "aggregating", "graph", "index"):
         assert stages[stage]["state"] == "done", stage
     assert stages["parsing"]["filesTotal"] == 8
     assert stages["parsing"]["filesParsed"] == 8
