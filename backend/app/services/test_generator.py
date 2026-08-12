@@ -51,12 +51,32 @@ def _is_valid_python(code: str) -> bool:
         return False
 
 
+def _typed_arg_for_param(param: str) -> str:
+    """Return a conservative, realistic Python argument from a parameter token."""
+    token = param.strip().lower()
+    annotation = token.split(":", 1)[1].strip() if ":" in token else ""
+    annotation = annotation.split("=", 1)[0].strip().lower()
+    name = token.split(":", 1)[0].split("=", 1)[0].strip().lower()
+    source = f"{name} {annotation}"
+
+    if any(key in source for key in ("float", "amount", "rate", "price", "ratio", "pct", "percentage")):
+        return "1.0"
+    if any(key in source for key in ("int", "count", "n", "limit", "index", "size", "year", "age")):
+        return "1"
+    if any(key in source for key in ("bool", "enabled", "active", "flag", "valid")):
+        return "True"
+    if any(key in source for key in ("list", "sequence", "items", "expenses", "rows", "values")):
+        return "[]"
+    if any(key in source for key in ("dict", "mapping", "config", "expense", "payload", "data", "options")):
+        return "{}"
+    if any(key in source for key in ("str", "string", "name", "key", "category", "label", "text", "path", "message")):
+        return '"test"'
+    return "None"
+
+
 def _build_python_test_fallback(entities: list[Entity]) -> str:
-    """Generate syntactically valid pytest test suite covering main & exception paths."""
-    lines: list[str] = [
-        "import pytest",
-        "",
-    ]
+    """Generate syntactically valid pytest tests using annotation-grounded arguments."""
+    lines: list[str] = ["import pytest", ""]
     module_stems = sorted(
         {
             Path(e.file.path).stem
@@ -82,17 +102,13 @@ def _build_python_test_fallback(entities: list[Entity]) -> str:
         lines.append("")
 
         sig = entity.signature or ""
-        param_count = 1
-        if "(" in sig and ")" in sig:
-            params_str = sig[sig.find("(") + 1 : sig.rfind(")")]
-            param_list = [
-                p.strip()
-                for p in params_str.split(",")
-                if p.strip() and p.strip() not in ("self", "cls")
-            ]
-            param_count = len(param_list)
-
-        args_str = ", ".join(["None"] * param_count) if param_count > 0 else ""
+        params_str = sig[sig.find("(") + 1 : sig.rfind(")")] if "(" in sig and ")" in sig else ""
+        param_list = [
+            p.strip()
+            for p in params_str.split(",")
+            if p.strip() and p.strip() not in ("self", "cls")
+        ]
+        args_str = ", ".join(_typed_arg_for_param(p) for p in param_list)
 
         lines.append(f"def test_{func_name}_exception_path():")
         lines.append(
@@ -139,9 +155,7 @@ def _build_java_test_fallback(entities: list[Entity]) -> str:
     return "\n".join(lines)
 
 
-def _choose_test_language(
-    target_entities: list[Entity], repository: Repository
-) -> str:
+def _choose_test_language(target_entities: list[Entity], repository: Repository) -> str:
     """Choose the language from actual target files, not repository dict ordering."""
     entity_languages = [
         e.file.language
@@ -152,15 +166,10 @@ def _choose_test_language(
         counts = Counter(entity_languages)
         return max(counts, key=lambda language: (counts[language], language == "python"))
 
-    file_languages = [
-        f.language
-        for f in repository.files
-        if f.language in ("python", "java")
-    ]
+    file_languages = [f.language for f in repository.files if f.language in ("python", "java")]
     if file_languages:
         counts = Counter(file_languages)
         return max(counts, key=lambda language: (counts[language], language == "python"))
-
     return "python"
 
 
@@ -183,29 +192,22 @@ def generate_unit_tests(
         for e in all_entities
         if e.file and "test" not in e.file.path.lower() and "conftest" not in e.file.path.lower()
     ]
-
     if not target_entities:
         target_entities = all_entities[:5]
 
     main_lang = _choose_test_language(target_entities, repository)
-
     functions_info = "\n".join(
-        f"- {e.name} ({e.file.path if e.file else 'unknown'}, lines "
-        f"{e.line_start}-{e.line_end}): signature `{e.signature}`"
+        f"- {e.name} ({e.file.path if e.file else 'unknown'}, lines {e.line_start}-{e.line_end}): signature `{e.signature}`"
         for e in target_entities
     )
-
     static_facts = "\n".join(
         f"- {e.name}: CCN complexity={e.complexity}, docstring='{e.docstring or 'None'}'"
         for e in target_entities
     )
-
     existing_test_files = [
         f for f in repository.files if "test" in f.path.lower() or "conftest" in f.path.lower()
     ]
-    existing_tests_str = (
-        ", ".join(f.path for f in existing_test_files) if existing_test_files else "None"
-    )
+    existing_tests_str = ", ".join(f.path for f in existing_test_files) if existing_test_files else "None"
 
     try:
         root_dir = repository_root(repository)
@@ -219,16 +221,13 @@ def generate_unit_tests(
             full_path = root_dir / e.file.path
             if full_path.is_file():
                 try:
-                    lines = full_path.read_text(encoding="utf-8", errors="replace").splitlines()
-                    func_code = "\n".join(
-                        lines[max(0, e.line_start - 1) : min(len(lines), e.line_end)]
-                    )
+                    source_lines = full_path.read_text(encoding="utf-8", errors="replace").splitlines()
+                    func_code = "\n".join(source_lines[max(0, e.line_start - 1) : min(len(source_lines), e.line_end)])
                     snippets.append(f"# {e.file.path}:{e.line_start}\n{func_code}")
                 except Exception:
                     pass
 
     source_snippets_str = "\n\n".join(snippets) if snippets else "(Source unavailable)"
-
     user_prompt = TEST_GENERATION_USER.format(
         language=main_lang,
         functions=functions_info,
@@ -238,11 +237,9 @@ def generate_unit_tests(
     )
     system_prompt = secure_system_prompt(TEST_GENERATION_SYSTEM)
 
-    llm_gateway = get_llm_gateway()
     generated_code: str | None = None
-
     try:
-        resp = llm_gateway.complete(prompt=user_prompt, system=system_prompt)
+        resp = get_llm_gateway().complete(prompt=user_prompt, system=system_prompt)
         cleaned = _clean_code_fences(resp.content)
         is_py = main_lang == "python" and _is_valid_python(cleaned) and "def test_" in cleaned
         is_java = main_lang in ("java", "junit") and "class " in cleaned and "@Test" in cleaned
@@ -252,29 +249,23 @@ def generate_unit_tests(
         logger.info("LLM test generation fallback triggered: %s", exc)
 
     if not generated_code:
-        if main_lang in ("java", "junit"):
-            generated_code = _build_java_test_fallback(target_entities)
-        else:
-            generated_code = _build_python_test_fallback(target_entities)
+        generated_code = (
+            _build_java_test_fallback(target_entities)
+            if main_lang in ("java", "junit")
+            else _build_python_test_fallback(target_entities)
+        )
 
     from app.services.sandbox_runner import execute_sandbox_test_run
 
+    test_run = execute_sandbox_test_run(db=db, repository=repository, test_code=generated_code)
     target_func_names = [e.name for e in target_entities]
-
-    # Run sandbox execution & coverage measurement
-    test_run = execute_sandbox_test_run(
-        db=db,
-        repository=repository,
-        test_code=generated_code,
-    )
-
     for e in target_entities:
         db.add(
             TestCase(
                 test_run_id=test_run.id,
                 name=f"test_{e.name}_main_branch",
                 target_entity_id=e.id,
-                status="passed",
+                status="passed" if test_run.status == "passed" else "failed",
                 coverage_line_nums=list(range(e.line_start, e.line_end + 1)),
                 duration_ms=12,
             )
@@ -284,12 +275,11 @@ def generate_unit_tests(
                 test_run_id=test_run.id,
                 name=f"test_{e.name}_exception_path",
                 target_entity_id=e.id,
-                status="passed",
+                status="passed" if test_run.status == "passed" else "failed",
                 coverage_line_nums=[e.line_start],
                 duration_ms=8,
             )
         )
-
     db.commit()
 
     return GenerateTestCodeResponse(
@@ -303,23 +293,25 @@ def generate_unit_tests(
 
 def _build_python_repair_fallback(entities: list[Entity]) -> str:
     """Generate supplementary pytest test code targeting uncovered branches."""
-    lines: list[str] = [
-        "# Coverage Repair Loop - Additional Uncovered Branch Tests",
-    ]
+    lines: list[str] = ["# Coverage Repair Loop - Additional Uncovered Branch Tests"]
     for entity in entities:
         if not entity.file or "test" in entity.file.path.lower():
             continue
         stem = Path(entity.file.path).stem
         func_name = entity.name
-        lines.append(f"def test_{func_name}_uncovered_branch():")
-        lines.append(f'    """Target uncovered branch/lines of {func_name}."""')
-        lines.append(f"    assert hasattr({stem}, '{func_name}')")
-        lines.append(f"    func = getattr({stem}, '{func_name}')")
-        lines.append("    try:")
-        lines.append("        func()")
-        lines.append("    except Exception:")
-        lines.append("        pass")
-        lines.append("")
+        lines.extend(
+            [
+                f"def test_{func_name}_uncovered_branch():",
+                f'    """Target uncovered branch/lines of {func_name}."""',
+                f"    assert hasattr({stem}, '{func_name}')",
+                f"    func = getattr({stem}, '{func_name}')",
+                "    try:",
+                "        func()",
+                "    except Exception:",
+                "        pass",
+                "",
+            ]
+        )
     return "\n".join(lines)
 
 
@@ -330,12 +322,16 @@ def _build_java_repair_fallback(entities: list[Entity]) -> str:
         if not entity.file or "test" in entity.file.path.lower():
             continue
         func_name = entity.name
-        lines.append("    @Test")
-        lines.append(f"    public void test_{func_name}_uncovered_branch() {{")
-        lines.append(f"        // Target uncovered branch for {func_name}")
-        lines.append("        assertTrue(true);")
-        lines.append("    }")
-        lines.append("")
+        lines.extend(
+            [
+                "    @Test",
+                f"    public void test_{func_name}_uncovered_branch() {{",
+                f"        // Target uncovered branch for {func_name}",
+                "        assertTrue(true);",
+                "    }",
+                "",
+            ]
+        )
     return "\n".join(lines)
 
 
@@ -355,55 +351,42 @@ def generate_uncovered_tests(
         .order_by(TestRun.created_at.desc())
         .first()
     )
-
     if latest_run is None or not latest_run.test_code:
         gen_res = generate_unit_tests(db, repository)
         latest_run = db.get(TestRun, gen_res.test_run_id)
-
     if latest_run is None:
         raise ValueError("Failed to obtain baseline test run")
-
     if latest_run.line_coverage >= target_coverage and latest_run.status == "passed":
         return latest_run
 
-    main_lang = (
-        list(repository.languages.keys())[0].lower()
-        if repository.languages
-        else "python"
-    )
-
-    query = db.query(Entity).filter(
-        Entity.repository_id == repository.id,
-        Entity.type.in_(["function", "method"]),
+    main_lang = _choose_test_language(
+        [e for e in repository.entities if e.type in ("function", "method") and e.file],
+        repository,
     )
     target_entities = [
-        e
-        for e in query.all()
+        e for e in db.query(Entity).filter(
+            Entity.repository_id == repository.id,
+            Entity.type.in_(["function", "method"]),
+        ).all()
         if e.file and "test" not in e.file.path.lower()
     ]
 
     current_test_code = latest_run.test_code or ""
     current_run = latest_run
-
     for iteration_num in range(2, max_iterations + 1):
         if current_run.line_coverage >= target_coverage:
             break
 
         uncovered_list = current_run.uncovered_lines or []
         uncovered_str = "\n".join(
-            f"- File: {item.get('file', 'unknown')}, Line: {item.get('line', '?')}, "
-            f"Branch: {item.get('branch', False)}"
+            f"- File: {item.get('file', 'unknown')}, Line: {item.get('line', '?')}, Branch: {item.get('branch', False)}"
             for item in uncovered_list
             if isinstance(item, dict)
-        )
-        if not uncovered_str:
-            uncovered_str = "- All primary lines covered"
-
+        ) or "- All primary lines covered"
         functions_facts = "\n".join(
             f"- {e.name}: signature `{e.signature}`, lines {e.line_start}-{e.line_end}"
             for e in target_entities
         )
-
         user_prompt = TEST_REPAIR_USER.format(
             line_coverage=current_run.line_coverage,
             branch_coverage=current_run.branch_coverage,
@@ -415,8 +398,7 @@ def generate_uncovered_tests(
 
         additional_code: str | None = None
         try:
-            llm_gateway = get_llm_gateway()
-            resp = llm_gateway.complete(prompt=user_prompt, system=system_prompt)
+            resp = get_llm_gateway().complete(prompt=user_prompt, system=system_prompt)
             cleaned = _clean_code_fences(resp.content)
             if "def test_" in cleaned or "@Test" in cleaned:
                 additional_code = cleaned
@@ -424,13 +406,13 @@ def generate_uncovered_tests(
             logger.info("LLM test repair fallback triggered: %s", exc)
 
         if not additional_code:
-            if main_lang in ("java", "junit"):
-                additional_code = _build_java_repair_fallback(target_entities)
-            else:
-                additional_code = _build_python_repair_fallback(target_entities)
+            additional_code = (
+                _build_java_repair_fallback(target_entities)
+                if main_lang in ("java", "junit")
+                else _build_python_repair_fallback(target_entities)
+            )
 
         current_test_code = current_test_code + "\n\n" + additional_code
-
         current_run = execute_sandbox_test_run(
             db=db,
             repository=repository,
@@ -439,8 +421,8 @@ def generate_uncovered_tests(
         current_run.iteration = iteration_num
         current_run.target_reached = (
             current_run.line_coverage >= target_coverage
-        ) and (current_run.status == "passed")
-
+            and current_run.status == "passed"
+        )
         db.add(current_run)
         db.commit()
         db.refresh(current_run)
