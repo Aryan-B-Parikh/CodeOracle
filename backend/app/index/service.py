@@ -97,8 +97,10 @@ def embed_cached(db: Session, texts: list[str]) -> list[list[float]]:
         by_hash[row.content_hash] = _coerce_list(row.embedding)
 
     needed_indices = [i for i, h in enumerate(hashes) if h not in by_hash]
-    missing_vectors = (
-        embedder.embed_many([texts[i] for i in needed_indices]) if needed_indices else []
+    missing_vectors: list[list[float]] = (
+        embedder.embed_many([texts[i] for i in needed_indices])
+        if needed_indices
+        else []
     )
 
     vectors: list[list[float] | None] = [None] * len(hashes)
@@ -107,8 +109,6 @@ def embed_cached(db: Session, texts: list[str]) -> list[list[float]]:
             vectors[i] = by_hash[h]
 
     for vector, index in zip(missing_vectors, needed_indices, strict=True):
-        if vector is None:
-            raise RuntimeError("Embedding provider returned a missing vector")
         vectors[index] = vector
 
     resolved_vectors: list[list[float]] = []
@@ -125,7 +125,6 @@ def embed_cached(db: Session, texts: list[str]) -> list[list[float]]:
             embedding=vector,
         )
         for index, vector in zip(needed_indices, missing_vectors, strict=True)
-        if vector is not None
     ]
     if new_rows:
         db.add_all(new_rows)
