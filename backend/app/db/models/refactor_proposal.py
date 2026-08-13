@@ -47,6 +47,7 @@ class RefactorProposalRecord(Base):
     original_checksum: Mapped[str] = mapped_column(String(64), nullable=False)
     rationale: Mapped[list] = mapped_column(JSONVariant, default=list)
     behavioral_differences: Mapped[list] = mapped_column(JSONVariant, default=list)
+    # Validation fields — set at proposal creation time
     syntax_valid: Mapped[str | None] = mapped_column(
         "syntax_valid", String(8), nullable=True
     )

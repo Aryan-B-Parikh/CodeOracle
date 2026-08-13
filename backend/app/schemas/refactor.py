@@ -45,6 +45,11 @@ class RefactorProposal(BaseModel):
     )
     # SHA-256 checksum of the original source — proves original repo unchanged
     original_checksum: str
+    # Syntax validation outcome for the proposed code
+    syntax_valid: bool = True
+    validation_error: str | None = None
+    # read_only guard — the T-17 endpoint NEVER applies changes to files
+    read_only: bool = True
 
 
 RefactorProposalEnvelope = Envelope[RefactorProposal]
