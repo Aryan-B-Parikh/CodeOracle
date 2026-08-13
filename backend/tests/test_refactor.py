@@ -112,3 +112,71 @@ def test_propose_refactor_original_unchanged(client: TestClient) -> None:
     d1, d2 = r1.json()["data"], r2.json()["data"]
     assert d1["original"] == d2["original"]
     assert d1["originalChecksum"] == d2["originalChecksum"]
+
+
+def test_detect_breaking_changes_unit() -> None:
+    from app.db.session import SessionLocal
+    from app.db.models.entity import Entity
+    from app.services.refactor import detect_breaking_changes
+    import uuid
+
+    with SessionLocal() as db:
+        file_id = uuid.uuid4()
+        entity = Entity(
+            id=uuid.uuid4(),
+            repository_id=uuid.uuid4(),
+            file_id=file_id,
+            name="test_func",
+            type="function",
+            language="python",
+            line_start=1,
+            line_end=10,
+        )
+        
+        # Test 1: No changes
+        original = "def test_func(x, y):\n    return x + y"
+        proposed = "def test_func(x, y):\n    # docstring\n    return x + y"
+        res = detect_breaking_changes(db, entity, original, proposed)
+        assert res.detected is False
+        assert len(res.changes) == 0
+
+        # Test 2: Removed arg (HIGH)
+        proposed = "def test_func(x):\n    return x"
+        res = detect_breaking_changes(db, entity, original, proposed)
+        assert res.detected is True
+        assert len(res.changes) == 1
+        assert res.changes[0].impact == "HIGH"
+        assert "removed" in res.changes[0].reason
+
+        # Test 3: Added required arg (HIGH)
+        proposed = "def test_func(x, y, z):\n    return x + y + z"
+        res = detect_breaking_changes(db, entity, original, proposed)
+        assert res.detected is True
+        assert len(res.changes) == 1
+        assert res.changes[0].impact == "HIGH"
+        assert "required" in res.changes[0].reason.lower()
+
+        # Test 4: Exception raised (MEDIUM)
+        proposed = "def test_func(x, y):\n    raise ValueError('error')"
+        res = detect_breaking_changes(db, entity, original, proposed)
+        assert res.detected is True
+        assert any(c.impact == "MEDIUM" for c in res.changes)
+        
+        # Test 5: Java signature change
+        java_entity = Entity(
+            id=uuid.uuid4(),
+            repository_id=uuid.uuid4(),
+            file_id=file_id,
+            name="calc",
+            type="method",
+            language="java",
+            line_start=1,
+            line_end=10,
+        )
+        original_java = "public int calc(int a, String b) {}"
+        proposed_java = "public int calc(int a, String b, double c) {}"
+        res = detect_breaking_changes(db, java_entity, original_java, proposed_java)
+        assert res.detected is True
+        assert res.changes[0].impact == "HIGH"
+        assert "parameter count" in res.changes[0].reason.lower()
+

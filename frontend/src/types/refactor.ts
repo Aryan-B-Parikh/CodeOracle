@@ -1,3 +1,15 @@
+export interface BreakingChange {
+  entity: string
+  impact: 'HIGH' | 'MEDIUM' | 'LOW'
+  reason: string
+  affectedCallers: string[]
+}
+
+export interface BreakingChangesResult {
+  detected: boolean
+  changes: BreakingChange[]
+}
+
 export interface RefactorProposal {
   proposalId: string
   entityId: string
@@ -7,6 +19,7 @@ export interface RefactorProposal {
   proposed: string
   rationale: string[]
   behavioralDifferences: string[]
+  breakingChanges?: BreakingChangesResult
   originalChecksum: string
 }
 

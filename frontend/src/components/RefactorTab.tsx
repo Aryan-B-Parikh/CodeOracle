@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { RefactorProposal } from '../types/refactor'
+import { BreakingChange, RefactorProposal } from '../types/refactor'
 import { DiffViewer } from './DiffViewer'
 
 export interface RefactorTabProps {
@@ -147,6 +147,61 @@ export const RefactorTab: React.FC<RefactorTabProps> = ({
               )}
             </div>
           </div>
+
+          {/* Breaking Changes */}
+          {proposal.breakingChanges && proposal.breakingChanges.detected && (
+            <div style={styles.breakingChangesSection} data-testid="breaking-changes">
+              <h4 style={styles.breakingChangesTitle}>
+                <span style={styles.breakingChangesIcon}>⚠</span>
+                Breaking Changes Detected
+              </h4>
+              <p style={styles.breakingChangesSubtitle}>
+                The following callers may be impacted by this refactor.
+              </p>
+              <div style={styles.changesList}>
+                {proposal.breakingChanges.changes.map((change: BreakingChange, i: number) => (
+                  <div key={i} style={styles.changeItem}>
+                    <div style={styles.changeHeader}>
+                      <span
+                        style={{
+                          ...styles.impactBadge,
+                          ...(change.impact === 'HIGH'
+                            ? styles.impactHigh
+                            : change.impact === 'MEDIUM'
+                            ? styles.impactMedium
+                            : styles.impactLow),
+                        }}
+                      >
+                        {change.impact}
+                      </span>
+                      <span style={styles.changeEntity}>{change.entity}</span>
+                    </div>
+                    <p style={styles.changeReason}>{change.reason}</p>
+                    {change.affectedCallers.length > 0 && (
+                      <div style={styles.callersBox}>
+                        <span style={styles.callersLabel}>Affected callers:</span>
+                        <div style={styles.callersList}>
+                          {change.affectedCallers.map((caller, j) => (
+                            <code key={j} style={styles.callerLink}>
+                              {caller}
+                            </code>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* No breaking changes confirmation */}
+          {proposal.breakingChanges && !proposal.breakingChanges.detected && (
+            <div style={styles.noBreakingChangesBox}>
+              <span style={{ color: '#22c55e', fontWeight: 700 }}>✓</span>{' '}
+              No breaking changes detected — this refactor is backward compatible.
+            </div>
+          )}
         </>
       )}
     </div>
@@ -328,5 +383,116 @@ const styles: Record<string, React.CSSProperties> = {
   emptyText: {
     color: '#64748b',
     fontSize: '13px',
+  },
+  breakingChangesSection: {
+    backgroundColor: '#1c0a0a',
+    border: '1px solid #7f1d1d',
+    borderRadius: '12px',
+    padding: '20px',
+    marginTop: '20px',
+  },
+  breakingChangesTitle: {
+    margin: '0 0 6px 0',
+    fontSize: '15px',
+    fontWeight: '700',
+    color: '#fca5a5',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  breakingChangesIcon: {
+    fontSize: '18px',
+    color: '#ef4444',
+  },
+  breakingChangesSubtitle: {
+    margin: '0 0 16px 0',
+    fontSize: '12px',
+    color: '#b91c1c',
+  },
+  changesList: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '12px',
+  },
+  changeItem: {
+    backgroundColor: '#2a0a0a',
+    border: '1px solid #7f1d1d',
+    borderRadius: '8px',
+    padding: '14px',
+  },
+  changeHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    marginBottom: '6px',
+  },
+  impactBadge: {
+    fontSize: '11px',
+    fontWeight: '800',
+    padding: '2px 8px',
+    borderRadius: '4px',
+    letterSpacing: '0.06em',
+    flexShrink: 0,
+  },
+  impactHigh: {
+    backgroundColor: '#7f1d1d',
+    color: '#fecaca',
+  },
+  impactMedium: {
+    backgroundColor: '#78350f',
+    color: '#fde68a',
+  },
+  impactLow: {
+    backgroundColor: '#1e3a5f',
+    color: '#bae6fd',
+  },
+  changeEntity: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#f8fafc',
+  },
+  changeReason: {
+    margin: '0 0 10px 0',
+    fontSize: '13px',
+    color: '#fca5a5',
+    lineHeight: '1.5',
+  },
+  callersBox: {
+    backgroundColor: '#0f172a',
+    borderRadius: '6px',
+    padding: '10px',
+  },
+  callersLabel: {
+    display: 'block',
+    fontSize: '11px',
+    fontWeight: '600',
+    color: '#64748b',
+    marginBottom: '6px',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.05em',
+  },
+  callersList: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '4px',
+  },
+  callerLink: {
+    fontSize: '12px',
+    color: '#38bdf8',
+    backgroundColor: '#0c1829',
+    padding: '2px 6px',
+    borderRadius: '4px',
+    fontFamily: 'monospace',
+  },
+  noBreakingChangesBox: {
+    backgroundColor: '#052e16',
+    color: '#86efac',
+    borderRadius: '8px',
+    padding: '12px 16px',
+    fontSize: '13px',
+    marginTop: '20px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
   },
 }
