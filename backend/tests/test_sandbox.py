@@ -32,7 +32,8 @@ def test_build_command_enforces_hardening() -> None:
     assert "--cap-drop ALL" in command
     assert "--pids-limit 128" in command
     assert "--user codeoracle" in command
-    assert "/sandbox:ro" in command
+    assert "/sandbox/src:ro" in command
+    assert "/sandbox/tests:ro" in command
 
 
 def test_staging_enforces_source_size_limit(
@@ -239,7 +240,6 @@ def test_execute_sandbox_test_run_uses_reported_stats(
             "test_c_main_branch",
         }
         assert {c.duration_ms for c in cases} == {12, 8, 21}
-        # Coverage lines are only stored when actually measured per test.
         assert all(c.coverage_line_nums is None for c in cases)
 
 
@@ -340,4 +340,3 @@ def test_execute_sandbox_test_run_service() -> None:
         assert test_run.status in ("passed", "failed")
         assert test_run.line_coverage >= 0.0
         assert isinstance(test_run.uncovered_lines, list)
-
