@@ -64,9 +64,9 @@
 
 ## Phase 5 — Polish
 
-- [ ] **T-20** Processing pipeline UI
+- [x] **T-20** Processing pipeline UI
   - **AC:** Live pipeline stages render with ✓/⟳/○ states during analysis; no blank screens.
-- [ ] **T-21** Dashboard + report export
+- [x] **T-21** Dashboard + report export
   - **AC:** Landing shows repo stats (language, LOC, entity count), architecture tree, high-risk/circular warnings, coverage, safety; export produces a readable markdown/PDF report.
 
 ## Backlog (not MVP)

@@ -1,12 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { TestsTab } from './components/TestsTab'
 import { RefactorTab } from './components/RefactorTab'
+import { DashboardTab, RepositorySummaryData } from './components/DashboardTab'
+import { PipelineStatusCard } from './components/PipelineStatusCard'
 import { TestRunData } from './types/test_run'
 import { RefactorProposal } from './types/refactor'
 import { SafetyScoreData } from './types/safety'
 import {
   fetchLatestTestRun,
   fetchRepositories,
+  fetchRepositorySummary,
+  fetchRepositoryStatus,
+  downloadExecutiveReport,
   RepositorySummary,
   triggerGenerateUncovered,
   proposeRefactor,
@@ -25,6 +30,8 @@ export function App() {
   const [testRunData, setTestRunData] = useState<TestRunData | null>(null)
   const [refactorProposal, setRefactorProposal] = useState<RefactorProposal | null>(null)
   const [safetyData, setSafetyData] = useState<SafetyScoreData | null>(null)
+  const [summaryData, setSummaryData] = useState<RepositorySummaryData | null>(null)
+  const [pipelineStatus, setPipelineStatus] = useState<any | null>(null)
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -40,22 +47,20 @@ export function App() {
 
     let isMounted = true
     setLoading(true)
-    fetchLatestTestRun(repositoryId)
-      .then((envelope) => {
-        if (isMounted && envelope.data) {
-          setTestRunData(envelope.data)
-          setErrorMessage(null)
-        }
-      })
-      .catch((err) => {
-        if (isMounted) {
-          logger_error('Failed to load test run:', err)
-          setErrorMessage('Unable to load the latest test run.')
-        }
-      })
-      .finally(() => {
-        if (isMounted) setLoading(false)
-      })
+
+    Promise.all([
+      fetchLatestTestRun(repositoryId).catch(() => null),
+      fetchRepositorySummary(repositoryId).catch(() => null),
+      fetchRepositoryStatus(repositoryId).catch(() => null),
+    ]).then(([testEnv, sumEnv, statusEnv]) => {
+      if (!isMounted) return
+      if (testEnv?.data) setTestRunData(testEnv.data)
+      if (sumEnv?.data) setSummaryData(sumEnv.data)
+      if (statusEnv?.data) setPipelineStatus(statusEnv.data)
+      setErrorMessage(null)
+    }).finally(() => {
+      if (isMounted) setLoading(false)
+    })
 
     return () => {
       isMounted = false
@@ -212,6 +217,33 @@ export function App() {
       )}
 
       <main style={styles.mainContent}>
+        {(activeTab === 'overview' || activeTab === 'architecture') && (
+          <>
+            {pipelineStatus && (
+              <PipelineStatusCard
+                pipelineState={pipelineStatus.pipelineState}
+                currentStage={pipelineStatus.currentStage}
+                analysisStatus={pipelineStatus.analysisStatus}
+              />
+            )}
+            <DashboardTab
+              repositoryId={repositoryId || undefined}
+              repositoryName={repositories.find((r) => r.id === repositoryId)?.name}
+              summaryData={summaryData}
+              loading={loading}
+              onDownloadReport={
+                repositoryId
+                  ? () =>
+                      downloadExecutiveReport(
+                        repositoryId,
+                        repositories.find((r) => r.id === repositoryId)?.name
+                      )
+                  : undefined
+              }
+            />
+          </>
+        )}
+
         {activeTab === 'tests' && (
           <TestsTab
             repositoryId={repositoryId || undefined}
@@ -231,15 +263,18 @@ export function App() {
           />
         )}
 
-        {activeTab !== 'tests' && activeTab !== 'refactor' && (
-          <div style={styles.placeholderTab}>
-            <h2>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Tab</h2>
-            <p>
-              Not implemented yet (scoped out: core pipeline focuses on tests, refactor diffs &amp;
-              safety scores).
-            </p>
-          </div>
-        )}
+        {activeTab !== 'overview' &&
+          activeTab !== 'architecture' &&
+          activeTab !== 'tests' &&
+          activeTab !== 'refactor' && (
+            <div style={styles.placeholderTab}>
+              <h2>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Tab</h2>
+              <p>
+                Not implemented yet (scoped out: core pipeline focuses on dashboard analytics,
+                tests, refactor diffs &amp; safety scores).
+              </p>
+            </div>
+          )}
       </main>
     </div>
   )

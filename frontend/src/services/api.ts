@@ -93,4 +93,37 @@ export async function fetchSafetyScore(
   return res.json()
 }
 
+export async function fetchRepositorySummary(repositoryId: string) {
+  const res = await fetch(`${API_BASE}/repositories/${repositoryId}/summary`)
+  if (!res.ok) {
+    throw new Error(`Failed to fetch repository summary: status ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function fetchRepositoryStatus(repositoryId: string) {
+  const res = await fetch(`${API_BASE}/repositories/${repositoryId}/status`)
+  if (!res.ok) {
+    throw new Error(`Failed to fetch repository status: status ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function downloadExecutiveReport(repositoryId: string, repositoryName = 'Repository') {
+  const res = await fetch(`${API_BASE}/repositories/${repositoryId}/report`)
+  if (!res.ok) {
+    throw new Error(`Failed to download report: status ${res.status}`)
+  }
+  const blob = await res.blob()
+  const url = window.URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${repositoryName.replace(/\s+/g, '_')}_Executive_Report.md`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  window.URL.revokeObjectURL(url)
+}
+
+
 

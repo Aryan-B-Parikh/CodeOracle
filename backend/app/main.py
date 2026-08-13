@@ -6,6 +6,7 @@ from app.api.routes.graph import router as graph_router
 from app.api.routes.health import router as health_router
 from app.api.routes.pipeline import router as pipeline_router
 from app.api.routes.refactor import router as refactor_router
+from app.api.routes.report import router as report_router
 from app.api.routes.repositories import router as repositories_router
 from app.api.routes.safety import router as safety_router
 from app.api.routes.search import router as search_router
@@ -23,4 +24,5 @@ app.include_router(summary_router, prefix="/api/v1")
 app.include_router(tests_router, prefix="/api/v1")
 app.include_router(refactor_router, prefix="/api/v1")
 app.include_router(safety_router, prefix="/api/v1")
+app.include_router(report_router, prefix="/api/v1")
 app.include_router(search_router, prefix="/api/v1")
