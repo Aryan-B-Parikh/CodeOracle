@@ -302,6 +302,13 @@ def generate_unit_tests(
 def _build_python_repair_fallback(entities: list[Entity]) -> str:
     """Generate supplementary pytest test code targeting uncovered branches."""
     lines: list[str] = ["# Coverage Repair Loop - Additional Uncovered Branch Tests"]
+    stems = {
+        Path(e.file.path).stem for e in entities if e.file and "test" not in e.file.path.lower()
+    }
+    for stem in sorted(stems):
+        lines.append(f"import {stem}")
+    lines.append("")
+
     for entity in entities:
         if not entity.file or "test" in entity.file.path.lower():
             continue
@@ -309,14 +316,24 @@ def _build_python_repair_fallback(entities: list[Entity]) -> str:
         func_name = entity.name
         lines.extend(
             [
-                f"def test_{func_name}_uncovered_branch():",
-                f'    """Target uncovered branch/lines of {func_name}."""',
-                f"    assert hasattr({stem}, '{func_name}')",
-                f"    func = getattr({stem}, '{func_name}')",
-                "    try:",
-                "        func()",
-                "    except Exception:",
-                "        pass",
+                f"def test_{func_name}_repair_branch():",
+                f"    func = getattr({stem}, '{func_name}', None)",
+                "    if callable(func):",
+                "        sample_args = [",
+                "            (),",
+                "            (100.0, 1000.0),",
+                "            (850.0, 1000.0),",
+                "            (1200.0, 1000.0),",
+                "            ('admin', 's3cret'),",
+                "            ('guest', 'guest'),",
+                "            ([], 100.0),",
+                "            ([{'category': 'food', 'amount': 10.0}], 100.0),",
+                "        ]",
+                "        for args in sample_args:",
+                "            try:",
+                "                func(*args)",
+                "            except Exception:",
+                "                pass",
                 "",
             ]
         )

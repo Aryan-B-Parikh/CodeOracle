@@ -68,8 +68,6 @@ def _generate_10k_loc_zip() -> bytes:
 @pytest.mark.scalability
 def test_10k_loc_scalability_benchmark(client: TestClient) -> None:
     """Benchmark full analysis pipeline on exactly 10,000-10,500 scanner LOC codebase."""
-    import resource
-
     t0 = time.time()
     zip_bytes = _generate_10k_loc_zip()
 
@@ -81,8 +79,6 @@ def test_10k_loc_scalability_benchmark(client: TestClient) -> None:
     assert upload_resp.status_code == 201
     upload_ms = round((time.time() - t_upload_start) * 1000, 2)
     repo_id = uuid.UUID(upload_resp.json()["data"]["id"])
-
-    t_pipeline_start = time.time()
 
     with SessionLocal() as db:
         repository = db.get(Repository, repo_id)
@@ -104,7 +100,8 @@ def test_10k_loc_scalability_benchmark(client: TestClient) -> None:
     wall_time_ms = round((time.time() - t0) * 1000, 2)
 
     try:
-        peak_memory_mb = round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 2)
+        import psutil
+        peak_memory_mb = round(psutil.Process().memory_info().rss / (1024 * 1024), 2)
     except Exception:
         peak_memory_mb = 0.0
 

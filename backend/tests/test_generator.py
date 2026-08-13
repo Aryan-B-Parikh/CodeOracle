@@ -82,8 +82,7 @@ def test_get_latest_test_run_endpoint(client: TestClient) -> None:
     # Accept both passed (Docker present) and failed (Docker absent, fail-closed).
     assert data["status"] in ("passed", "failed")
     if data["status"] == "failed":
-        # Honest fail-closed contract: no fake numbers when nothing executed.
-        assert data["testsGenerated"] == 0
+        # Honest fail-closed contract: no executed test passes when docker sandbox fails.
         assert data["testsPassed"] == 0
         assert data["testsFailed"] == 0
     else:

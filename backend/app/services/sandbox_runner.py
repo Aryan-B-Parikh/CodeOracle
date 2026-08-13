@@ -65,7 +65,7 @@ def _choose_language(repository: Repository) -> str:
 
 def _match_target_entity(
     db: Session, repository_id: uuid.UUID, case_name: str
-) -> str | None:
+) -> uuid.UUID | None:
     """Best-effort link: junitxml case names are ``test_<entity>_...``."""
     tail = case_name[len("test_") :] if case_name.startswith("test_") else case_name
     for sep in ("_main_branch", "_exception_path", "_uncovered"):
@@ -79,7 +79,7 @@ def _match_target_entity(
         .filter(Entity.repository_id == repository_id, Entity.name == tail)
         .first()
     )
-    return str(entity.id) if entity else None
+    return entity.id if entity else None
 
 
 def is_docker_sandbox_ready() -> bool:
@@ -119,16 +119,15 @@ def execute_sandbox_test_run(
         root_dir = get_settings().upload_dir / str(repository.id)
         root_dir.mkdir(parents=True, exist_ok=True)
 
-    with tempfile.TemporaryDirectory(prefix="codeoracle-run-") as tmp_dir:
+    with tempfile.TemporaryDirectory(prefix="codeoracle-run-") as tmp_dir, tempfile.TemporaryDirectory(prefix="codeoracle-tests-") as input_tests_tmp:
         staging_dir = Path(tmp_dir)
-        tests_dir = staging_dir / "tests"
-        tests_dir.mkdir(parents=True, exist_ok=True)
+        input_tests_dir = Path(input_tests_tmp)
 
         if test_code:
             test_file_name = (
                 "test_generated.py" if language == "python" else "GeneratedTest.java"
             )
-            (tests_dir / test_file_name).write_text(test_code, encoding="utf-8")
+            (input_tests_dir / test_file_name).write_text(test_code, encoding="utf-8")
 
         tests_report: dict | None = None
         timed_out = False
@@ -140,7 +139,7 @@ def execute_sandbox_test_run(
         if is_docker_sandbox_ready():
             try:
                 sandbox_stage.stage(
-                    root_dir, language, tests_dir if test_code else None, staging_dir
+                    root_dir, language, input_tests_dir if test_code else None, staging_dir
                 )
                 run_res = sandbox_run.run(
                     staging_dir, language, timeout=timeout, image=sandbox_run.IMAGE
@@ -203,7 +202,15 @@ def execute_sandbox_test_run(
         failed_tests = [
             {
                 "name": str(c.get("name", "")),
-                "targetEntity": _match_target_entity(db, repository.id, str(c.get("name", ""))),
+                "targetEntity": (
+                    str(target_id)
+                    if (
+                        target_id := _match_target_entity(
+                            db, repository.id, str(c.get("name", ""))
+                        )
+                    )
+                    else None
+                ),
                 "message": f"Test failed (exit code {exit_code}, reason: {reason})",
             }
             for c in cases
@@ -239,13 +246,14 @@ def execute_sandbox_test_run(
         db.refresh(test_run)
 
         for case in cases:
+            target_entity_id = _match_target_entity(
+                db, repository.id, str(case.get("name", ""))
+            )
             db.add(
                 TestCase(
                     test_run_id=test_run.id,
                     name=str(case.get("name", "unknown")),
-                    target_entity_id=_match_target_entity(
-                        db, repository.id, str(case.get("name", ""))
-                    ),
+                    target_entity_id=target_entity_id,
                     status=str(case.get("status", "passed")),
                     coverage_line_nums=None,
                     duration_ms=int(case.get("durationMs", 0)),
