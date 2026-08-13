@@ -68,7 +68,7 @@ jobs:
       - name: Sandbox smoke test (Python)
         working-directory: backend/sandbox
         run: |
-          python run.py --language python --source ../../benchmark/legacy_demo/python/expense \
+          python run.py --language python --source ../../benchmark/legacy_demo/python \
             --tests ../../benchmark/legacy_demo/python/tests
       - name: Sandbox smoke test (Java)
         working-directory: backend/sandbox
