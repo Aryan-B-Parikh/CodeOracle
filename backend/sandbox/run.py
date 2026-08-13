@@ -25,7 +25,8 @@ _CHUNK = 65536
 
 PYTHON_CMD = (
     "cd /home/codeoracle && "
-    "PYTHONPATH=/sandbox/src pytest -s /sandbox/tests -p no:cacheprovider --cov /sandbox/src --cov-branch "
+    "PYTHONPATH=/sandbox/src pytest -s /sandbox/tests -p no:cacheprovider "
+    "--cov /sandbox/src --cov-branch "
     "--cov-report=json:/home/codeoracle/coverage.json --cov-report=term "
     "--junitxml=/home/codeoracle/junit.xml; RC=$?; "
     "cat /home/codeoracle/coverage.json 2>/dev/null; "
@@ -36,8 +37,9 @@ JAVA_CMD = (
     "cp -r /sandbox /home/codeoracle/project && "
     "cd /home/codeoracle/project && "
     "mvn -o -q test jacoco:report; RC=$?; "
-    "(python3 /opt/parse_jacoco.py /home/codeoracle/project/target/site/jacoco/jacoco.xml "
-    "2>/dev/null || echo '{\"lineCoverage\": 0.0, \"branchCoverage\": 0.0, \"uncoveredLines\": []}'); "
+    "(python3 /opt/parse_jacoco.py "
+    "/home/codeoracle/project/target/site/jacoco/jacoco.xml 2>/dev/null || "
+    'echo \'{"lineCoverage": 0.0, "branchCoverage": 0.0, "uncoveredLines": []}\'); '
     "cat /home/codeoracle/project/target/surefire-reports/*.xml 2>/dev/null; "
     "exit $RC"
 )
@@ -171,7 +173,8 @@ def parse_tests_report(stdout: str) -> dict | None:
             except ValueError:
                 duration_ms = 0
             failed = case.find("failure") is not None or case.find("error") is not None
-            cases.append({"name": name, "durationMs": duration_ms, "status": "failed" if failed else "passed"})
+            status_str = "failed" if failed else "passed"
+            cases.append({"name": name, "durationMs": duration_ms, "status": status_str})
 
     if not cases and total == 0:
         return None
@@ -209,9 +212,15 @@ def run(staging_dir: Path, language: str, timeout: int, image: str) -> dict:
     command = build_command(staging_dir, language, name, image)
     started = time.monotonic()
 
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    out_reader = _BoundedReader(proc.stdout, policy.MAX_STDOUT_BYTES, on_exceed=lambda: _kill_container(name))
-    err_reader = _BoundedReader(proc.stderr, policy.MAX_STDERR_BYTES, on_exceed=lambda: _kill_container(name))
+    proc = subprocess.Popen(
+        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+    )
+    out_reader = _BoundedReader(
+        proc.stdout, policy.MAX_STDOUT_BYTES, on_exceed=lambda: _kill_container(name)
+    )
+    err_reader = _BoundedReader(
+        proc.stderr, policy.MAX_STDERR_BYTES, on_exceed=lambda: _kill_container(name)
+    )
     out_reader.start()
     err_reader.start()
 

@@ -189,6 +189,13 @@ Full re-audit of tasks T-01..T-17 (commit `7a5bcf9`) found 22 findings across 17
 - **Housekeeping:** committed `__pycache__` removed via `git rm -r --cached`, `parse_tests_report` strips XML declarations before wrapping stdout (real junit output starts with `<?xml?>`).
 - **Final state:** `ruff check backend/app` clean, mypy 73/73 files, `alembic upgrade head` clean on SQLite, **`pytest backend/tests` = 120 passed / 9 skipped** (6 Docker + 3 pgvector env-gated), benchmark `FINAL_COVERAGE=94.3% PASS`, frontend lint/typecheck/11 vitest/build all green.
 
+## 2026-08-13 — T-18 & T-19 Breaking-Change Detection & Refactor Safety Score
+
+- **`app/services/safety.py` + `app/api/routes/safety.py`**: Built AST & LLM breaking-change detector (`detect_breaking_changes`) and 0–100 Refactor Safety Score engine (`calculate_safety_score`).
+- **Safety Sub-scores:** Computes 4 weighted sub-scores (`api_compatibility`, `test_compatibility`, `dependency_impact`, `behavioral_risk`) and assigns `risk_level` (`"low"`, `"medium"`, `"high"`). Exposes endpoints `POST /api/v1/repositories/{id}/refactors/{proposal_id}/safety` and `GET .../safety`.
+- **Frontend Integration:** Added `SafetyScoreCard` React component rendering 0-100 gauge, risk badges, sub-score bars, breaking changes list with `file:line` callers, and safety recommendations.
+- **Verified:** 115 Python backend tests passed (`pytest backend/tests`), 13 Vitest frontend tests passed (`npm run test`), and clean production build (`npm run build`).
+
 ## Template for new entries
 
 ```

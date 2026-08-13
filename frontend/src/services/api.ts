@@ -1,5 +1,6 @@
 import { TestRunEnvelope } from '../types/test_run'
 import { RefactorProposalEnvelope } from '../types/refactor'
+import { SafetyScoreEnvelope } from '../types/safety'
 
 const API_BASE = '/api/v1'
 
@@ -76,4 +77,20 @@ export async function proposeRefactor(
   }
   return res.json()
 }
+
+export async function fetchSafetyScore(
+  repositoryId: string,
+  proposalId: string
+): Promise<SafetyScoreEnvelope> {
+  const url = `${API_BASE}/repositories/${repositoryId}/refactors/${proposalId}/safety`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
+  if (!res.ok) {
+    throw new Error(`Failed to fetch safety score: status ${res.status}`)
+  }
+  return res.json()
+}
+
 

@@ -1,10 +1,13 @@
 import React, { useState } from 'react'
-import { BreakingChange, RefactorProposal } from '../types/refactor'
+import { RefactorProposal } from '../types/refactor'
+import { SafetyScoreData } from '../types/safety'
 import { DiffViewer } from './DiffViewer'
+import { SafetyScoreCard } from './SafetyScoreCard'
 
 export interface RefactorTabProps {
   repositoryId?: string
   proposal: RefactorProposal | null
+  safetyData?: SafetyScoreData | null
   loading?: boolean
   onPropose?: (entityId: string) => void
 }
@@ -12,6 +15,7 @@ export interface RefactorTabProps {
 export const RefactorTab: React.FC<RefactorTabProps> = ({
   repositoryId,
   proposal,
+  safetyData = null,
   loading = false,
   onPropose,
 }) => {
@@ -101,6 +105,9 @@ export const RefactorTab: React.FC<RefactorTabProps> = ({
             </div>
           </div>
 
+          {/* Safety Score Card (T-19 & T-18) */}
+          <SafetyScoreCard safetyData={safetyData} loading={loading} />
+
           {/* Diff view */}
           <div style={styles.section}>
             <h4 style={styles.sectionTitle}>Code Diff</h4>
@@ -147,61 +154,6 @@ export const RefactorTab: React.FC<RefactorTabProps> = ({
               )}
             </div>
           </div>
-
-          {/* Breaking Changes */}
-          {proposal.breakingChanges && proposal.breakingChanges.detected && (
-            <div style={styles.breakingChangesSection} data-testid="breaking-changes">
-              <h4 style={styles.breakingChangesTitle}>
-                <span style={styles.breakingChangesIcon}>⚠</span>
-                Breaking Changes Detected
-              </h4>
-              <p style={styles.breakingChangesSubtitle}>
-                The following callers may be impacted by this refactor.
-              </p>
-              <div style={styles.changesList}>
-                {proposal.breakingChanges.changes.map((change: BreakingChange, i: number) => (
-                  <div key={i} style={styles.changeItem}>
-                    <div style={styles.changeHeader}>
-                      <span
-                        style={{
-                          ...styles.impactBadge,
-                          ...(change.impact === 'HIGH'
-                            ? styles.impactHigh
-                            : change.impact === 'MEDIUM'
-                            ? styles.impactMedium
-                            : styles.impactLow),
-                        }}
-                      >
-                        {change.impact}
-                      </span>
-                      <span style={styles.changeEntity}>{change.entity}</span>
-                    </div>
-                    <p style={styles.changeReason}>{change.reason}</p>
-                    {change.affectedCallers.length > 0 && (
-                      <div style={styles.callersBox}>
-                        <span style={styles.callersLabel}>Affected callers:</span>
-                        <div style={styles.callersList}>
-                          {change.affectedCallers.map((caller, j) => (
-                            <code key={j} style={styles.callerLink}>
-                              {caller}
-                            </code>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* No breaking changes confirmation */}
-          {proposal.breakingChanges && !proposal.breakingChanges.detected && (
-            <div style={styles.noBreakingChangesBox}>
-              <span style={{ color: '#22c55e', fontWeight: 700 }}>✓</span>{' '}
-              No breaking changes detected — this refactor is backward compatible.
-            </div>
-          )}
         </>
       )}
     </div>

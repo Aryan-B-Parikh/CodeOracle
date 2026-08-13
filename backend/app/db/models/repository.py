@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from app.db.models.entity import Entity
     from app.db.models.file import File
     from app.db.models.inheritance import Inheritance
+    from app.db.models.refactor_proposal import RefactorProposalRecord
     from app.db.models.test_run import TestRun
 
 JSONVariant = JSONB().with_variant(JSON(), "sqlite")
@@ -66,5 +67,8 @@ class Repository(Base):
         back_populates="repository", cascade="all, delete-orphan"
     )
     test_runs: Mapped[list[TestRun]] = relationship(
+        back_populates="repository", cascade="all, delete-orphan"
+    )
+    refactor_proposals: Mapped[list[RefactorProposalRecord]] = relationship(
         back_populates="repository", cascade="all, delete-orphan"
     )

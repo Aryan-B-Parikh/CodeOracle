@@ -8,6 +8,7 @@ from app.db.models.entity import Entity as Entity
 from app.db.models.file import File as File
 from app.db.models.import_ import Import as Import
 from app.db.models.inheritance import Inheritance as Inheritance
+from app.db.models.refactor_proposal import RefactorProposalRecord as RefactorProposalRecord
 from app.db.models.repository import Repository as Repository
 from app.db.models.test_case import TestCase as TestCase
 from app.db.models.test_run import TestRun as TestRun

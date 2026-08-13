@@ -3,12 +3,14 @@ import { TestsTab } from './components/TestsTab'
 import { RefactorTab } from './components/RefactorTab'
 import { TestRunData } from './types/test_run'
 import { RefactorProposal } from './types/refactor'
+import { SafetyScoreData } from './types/safety'
 import {
   fetchLatestTestRun,
   fetchRepositories,
   RepositorySummary,
   triggerGenerateUncovered,
   proposeRefactor,
+  fetchSafetyScore,
   uploadRepository,
 } from './services/api'
 
@@ -22,6 +24,7 @@ export function App() {
   const [repositories, setRepositories] = useState<RepositorySummary[]>([])
   const [testRunData, setTestRunData] = useState<TestRunData | null>(null)
   const [refactorProposal, setRefactorProposal] = useState<RefactorProposal | null>(null)
+  const [safetyData, setSafetyData] = useState<SafetyScoreData | null>(null)
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -46,8 +49,8 @@ export function App() {
       })
       .catch((err) => {
         if (isMounted) {
-          console.error('Failed to load test run:', err)
-          setTestRunData(null)
+          logger_error('Failed to load test run:', err)
+          setErrorMessage('Unable to load the latest test run.')
         }
       })
       .finally(() => {
@@ -60,9 +63,11 @@ export function App() {
   }, [repositoryId])
 
   const selectRepository = (id: string) => {
-    if (!id) return
-    setRepositoryId(id)
+    setRepositoryId(id || null)
+    setTestRunData(null)
     setRefactorProposal(null)
+    setSafetyData(null)
+    setErrorMessage(null)
   }
 
   const handleUpload = async (file: File | null) => {
@@ -71,10 +76,13 @@ export function App() {
     setErrorMessage(null)
     try {
       const repo = await uploadRepository(file)
-      setRepositories((prev) => [repo, ...prev])
-      selectRepository(repo.id)
-      setActiveTab('tests')
-      if (fileInputRef.current) fileInputRef.current.value = ''
+      if (repo?.id) {
+        setRepositoryId(repo.id)
+        setRepositories((prev) => [
+          repo,
+          ...prev.filter((r) => r.id !== repo.id),
+        ])
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       setErrorMessage(`Upload failed: ${msg}`)
@@ -84,7 +92,10 @@ export function App() {
   }
 
   const handleGenerateUncovered = async () => {
-    if (!repositoryId) return
+    if (!repositoryId) {
+      setErrorMessage('Select or upload a repository before generating tests.')
+      return
+    }
 
     setLoading(true)
     setErrorMessage(null)
@@ -106,10 +117,19 @@ export function App() {
     setLoading(true)
     setErrorMessage(null)
     setRefactorProposal(null)
+    setSafetyData(null)
     try {
       const envelope = await proposeRefactor(repositoryId, entityId)
       if (envelope.data) {
         setRefactorProposal(envelope.data)
+        try {
+          const safetyEnv = await fetchSafetyScore(repositoryId, envelope.data.proposalId)
+          if (safetyEnv.data) {
+            setSafetyData(safetyEnv.data)
+          }
+        } catch (safetyErr) {
+          logger_error('Failed to fetch safety score:', safetyErr)
+        }
       } else if (envelope.error) {
         setErrorMessage(`Refactor proposal failed: ${envelope.error.message}`)
       }
@@ -181,7 +201,11 @@ export function App() {
       {errorMessage && (
         <div style={styles.errorBanner} role="alert">
           <span>{errorMessage}</span>
-          <button onClick={() => setErrorMessage(null)} style={styles.closeBtn} aria-label="Dismiss error">
+          <button
+            onClick={() => setErrorMessage(null)}
+            style={styles.closeBtn}
+            aria-label="Dismiss error"
+          >
             ×
           </button>
         </div>
@@ -201,6 +225,7 @@ export function App() {
           <RefactorTab
             repositoryId={repositoryId || undefined}
             proposal={refactorProposal}
+            safetyData={safetyData}
             loading={loading}
             onPropose={repositoryId ? handleProposeRefactor : undefined}
           />
@@ -210,13 +235,18 @@ export function App() {
           <div style={styles.placeholderTab}>
             <h2>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Tab</h2>
             <p>
-              Not implemented yet (scoped out: processing pipeline/dashboard/report-export UI).
+              Not implemented yet (scoped out: core pipeline focuses on tests, refactor diffs &amp;
+              safety scores).
             </p>
           </div>
         )}
       </main>
     </div>
   )
+}
+
+function logger_error(msg: string, err: unknown) {
+  console.error(msg, err)
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -230,7 +260,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: '16px',
     padding: '0 24px',
     backgroundColor: '#1e293b',
     borderBottom: '1px solid #334155',
@@ -250,35 +279,31 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '2px 6px',
     borderRadius: '4px',
   },
-  repoControls: { display: 'flex', alignItems: 'center', gap: '8px', flex: 1 },
+  repoControls: { display: 'flex', alignItems: 'center', gap: '10px' },
   repoSelect: {
-    flex: 1,
-    maxWidth: '360px',
     backgroundColor: '#0f172a',
-    border: '1px solid #334155',
-    borderRadius: '8px',
-    padding: '8px 10px',
     color: '#f8fafc',
+    border: '1px solid #334155',
+    borderRadius: '6px',
+    padding: '6px 12px',
     fontSize: '13px',
-    outline: 'none',
   },
   uploadButton: {
-    backgroundColor: '#2563eb',
-    color: '#fff',
+    backgroundColor: '#0284c7',
+    color: '#ffffff',
     border: 'none',
-    borderRadius: '8px',
-    padding: '8px 14px',
+    borderRadius: '6px',
+    padding: '6px 14px',
     fontSize: '13px',
     fontWeight: '600',
     cursor: 'pointer',
-    whiteSpace: 'nowrap',
   },
-  navTabs: { display: 'flex', gap: '4px' },
+  navTabs: { display: 'flex', gap: '8px' },
   navButton: {
     backgroundColor: 'transparent',
     border: 'none',
-    padding: '16px 10px',
-    fontSize: '13px',
+    padding: '16px 12px',
+    fontSize: '14px',
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'color 0.2s',
@@ -292,7 +317,13 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     fontSize: '14px',
   },
-  closeBtn: { backgroundColor: 'transparent', border: 'none', color: '#fecaca', fontSize: '18px', cursor: 'pointer' },
+  closeBtn: {
+    backgroundColor: 'transparent',
+    border: 'none',
+    color: '#fecaca',
+    fontSize: '18px',
+    cursor: 'pointer',
+  },
   mainContent: { padding: '0' },
   placeholderTab: { padding: '40px', textAlign: 'center', color: '#94a3b8' },
 }

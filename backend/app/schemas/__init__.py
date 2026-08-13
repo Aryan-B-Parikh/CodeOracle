@@ -14,6 +14,11 @@ from app.schemas.impact import (
     ImpactEntitySummary,
     ImpactEnvelope,
 )
+from app.schemas.safety import (
+    BreakingChangeItem,
+    SafetyScoreData,
+    SafetyScoreEnvelope,
+)
 from app.schemas.summary import (
     AnalysisSummaryPayload,
     ArchIssue,
@@ -37,6 +42,7 @@ __all__ = [
     "AnalysisSummaryPayload",
     "ArchIssue",
     "ArchLayer",
+    "BreakingChangeItem",
     "CalleeItem",
     "CallerItem",
     "EntitySummary",
@@ -54,6 +60,8 @@ __all__ = [
     "ModuleSummaryEnvelope",
     "ModuleSummaryItem",
     "RepositorySummaryData",
+    "SafetyScoreData",
+    "SafetyScoreEnvelope",
     "SummaryEnvelope",
     "TestRunData",
     "TestRunEnvelope",

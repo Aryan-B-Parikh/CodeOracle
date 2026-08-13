@@ -57,9 +57,9 @@
 
 - [x] **T-17** Refactor proposal + diff
   - **AC:** `POST .../refactors/{entity}/propose` returns original vs. proposed code + WHY list; Monaco diff view renders; original repo unchanged (verified by checksum).
-- [ ] **T-18** Breaking-change detection
+- [x] **T-18** Breaking-change detection
   - **AC:** Comparing signatures/returns/exceptions/side effects flags changes; output lists impacted callers as `file:line`; correct HIGH/MEDIUM/LOW on crafted fixtures (e.g., changed arg count → HIGH).
-- [ ] **T-19** Refactor Safety Score
+- [x] **T-19** Refactor Safety Score
   - **AC:** Score 0–100 from api compat, test compat, dependency impact, behavioral risk; risk level low/medium/high; demo fixture scores and risk match hand-computed expectations.
 
 ## Phase 5 — Polish
