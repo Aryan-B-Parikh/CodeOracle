@@ -32,15 +32,20 @@ PYTHON_CMD = (
     "cd /home/codeoracle && "
     "pytest -s /sandbox/tests -p no:cacheprovider --cov /sandbox/src --cov-branch "
     "--cov-report=json:/home/codeoracle/coverage.json --cov-report=term "
-    "&& cat /home/codeoracle/coverage.json"
+    "--junitxml=/home/codeoracle/junit.xml; RC=$?; "
+    "cat /home/codeoracle/coverage.json 2>/dev/null; "
+    "cat /home/codeoracle/junit.xml 2>/dev/null; "
+    "exit $RC"
 )
 JAVA_CMD = (
     "cp -r /sandbox /home/codeoracle/project && "
     "cd /home/codeoracle/project && "
-    "mvn -o -q test jacoco:report && "
+    "mvn -o -q test jacoco:report; RC=$?; "
     "(python3 /opt/parse_jacoco.py /home/codeoracle/project/target/site/jacoco/jacoco.xml "
     "2>/dev/null || echo '{\"lineCoverage\": 0.0, \"branchCoverage\": 0.0, "
-    "\"uncoveredLines\": []}')"
+    "\"uncoveredLines\": []}'); "
+    "cat /home/codeoracle/project/target/surefire-reports/*.xml 2>/dev/null; "
+    "exit $RC"
 )
 
 
@@ -137,6 +142,61 @@ def _normalize_python_coverage(data: dict) -> dict:
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 
+def parse_tests_report(stdout: str) -> dict | None:
+    """Parse pytest (junitxml) or surefire XML embedded in stdout into real test stats.
+
+    Returns ``{"generated", "passed", "failed", "cases"}`` where each case is
+    ``{"name", "durationMs", "status"}`` measured by the test runner itself, or
+    ``None`` when no report is present in the output.
+    """
+    import xml.etree.ElementTree as ET
+
+    # The real report is cat'ed to stdout and starts with an XML declaration,
+    # which cannot appear at a non-root position once we wrap the output.
+    bare = re.sub(r"<\?xml[^>]*\?>", "", stdout)
+    if not bare.strip():
+        return None
+    try:
+        root = ET.fromstring(f"<root>{bare}</root>")
+    except ET.ParseError:
+        return None
+
+    cases: list[dict] = []
+    total = 0
+    for suite in root.iter("testsuite"):
+        try:
+            total += int(suite.attrib.get("tests", 0))
+        except ValueError:
+            continue
+        for case in suite.findall("testcase"):
+            name = str(case.attrib.get("name", "unknown"))
+            try:
+                duration_ms = int(round(float(case.attrib.get("time", 0.0)) * 1000))
+            except ValueError:
+                duration_ms = 0
+            failed = (
+                case.find("failure") is not None or case.find("error") is not None
+            )
+            cases.append(
+                {
+                    "name": name,
+                    "durationMs": duration_ms,
+                    "status": "failed" if failed else "passed",
+                }
+            )
+
+    if not cases and total == 0:
+        return None
+    failed = sum(1 for c in cases if c["status"] == "failed")
+    passed = len(cases) - failed
+    return {
+        "generated": total if total > 0 else len(cases),
+        "passed": passed,
+        "failed": failed,
+        "cases": cases,
+    }
+
+
 def extract_coverage(stdout: str) -> dict | None:
     for line in reversed(stdout.splitlines()):
         cleaned = _ANSI.sub("", line).strip()
@@ -194,6 +254,7 @@ def run(staging_dir: Path, language: str, timeout: int, image: str) -> dict:
     stdout = out_reader.data
     stderr = err_reader.data
     coverage = extract_coverage(stdout)
+    tests = parse_tests_report(stdout)
     log = (stdout + "\n--- stderr ---\n" + stderr)[-LOG_LIMIT:]
     return {
         "exitCode": exit_code,
@@ -202,6 +263,7 @@ def run(staging_dir: Path, language: str, timeout: int, image: str) -> dict:
         "reason": reason,
         "durationSeconds": round(time.monotonic() - started, 1),
         "coverage": coverage,
+        "tests": tests,
         "log": log,
     }
 

@@ -5,8 +5,8 @@ Revises: 0002_entities
 Create Date: 2026-08-11
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "0003_language_counts"
@@ -24,7 +24,7 @@ def upgrade() -> None:
             "language_counts",
             JSONB_VARIANT,
             nullable=False,
-            server_default=sa.text("'{}'::jsonb"),
+            server_default=sa.text("'{}'"),
         ),
     )
 

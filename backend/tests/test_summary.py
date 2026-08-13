@@ -5,11 +5,10 @@ import uuid
 import zipfile
 from pathlib import Path
 
-from fastapi.testclient import TestClient
-
 from app.db.models.repository import Repository
 from app.db.session import SessionLocal
 from app.services.analysis import analyze_repository
+from fastapi.testclient import TestClient
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
@@ -49,6 +48,8 @@ def test_repository_summary_and_architecture_classification(client: TestClient) 
     data = payload["data"]
     assert "summary" in data
     assert "highRiskEntities" in data
+    assert "provider" in data
+    assert data["provider"] in ("mock", "openai", "anthropic", None)
 
     summary = data["summary"]
     architecture = summary["architecture"]

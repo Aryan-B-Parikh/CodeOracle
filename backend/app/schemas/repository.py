@@ -36,3 +36,5 @@ class ImportRequest(BaseModel):
 
 
 RepositoryEnvelope = Envelope[RepositoryOut]
+
+RepositoryListEnvelope = Envelope[list[RepositoryOut]]

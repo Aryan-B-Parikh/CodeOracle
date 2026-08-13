@@ -5,11 +5,10 @@ import io
 import zipfile
 from pathlib import Path
 
-import pytest
-from fastapi.testclient import TestClient
-
 import app.services.ingestion as ingestion
+import pytest
 from app.api.routes import repositories as repo_routes
+from fastapi.testclient import TestClient
 
 
 def make_zip(files: dict[str, str]) -> bytes:

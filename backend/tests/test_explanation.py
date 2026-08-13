@@ -5,12 +5,11 @@ import uuid
 import zipfile
 from pathlib import Path
 
-from fastapi.testclient import TestClient
-
 from app.db.models.entity import Entity
 from app.db.models.repository import Repository
 from app.db.session import SessionLocal
 from app.services.analysis import analyze_repository
+from fastapi.testclient import TestClient
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
@@ -63,6 +62,10 @@ def test_entity_explanation_python_basic(client: TestClient) -> None:
     assert "explanation" in data
     assert "evidence" in data
 
+    # The provider must be surfaced so consumers can distinguish mock from real AI.
+    assert "provider" in data
+    assert data["provider"] in ("mock", "openai", "anthropic", None)
+
     # Verify entity info
     entity = data["entity"]
     assert entity["name"] == "calculate_tax"
@@ -106,7 +109,8 @@ def test_entity_explanation_python_basic(client: TestClient) -> None:
     # Spot-check: claims trace to actual fixture code
     claims_text = " ".join(item["claim"] for item in evidence)
     code_text = " ".join(item["code"] for item in evidence)
-    assert any(term in claims_text or term in code_text for term in ["exempt", "tax", "rate", "calculate_tax", "tax.py"])
+    terms = ["exempt", "tax", "rate", "calculate_tax", "tax.py"]
+    assert any(term in claims_text or term in code_text for term in terms)
 
 
 def test_entity_details_endpoint(client: TestClient) -> None:

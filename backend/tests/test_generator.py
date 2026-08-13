@@ -6,11 +6,10 @@ import uuid
 import zipfile
 from pathlib import Path
 
-from fastapi.testclient import TestClient
-
 from app.db.models.repository import Repository
 from app.db.session import SessionLocal
 from app.services.analysis import analyze_repository
+from fastapi.testclient import TestClient
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
@@ -82,7 +81,13 @@ def test_get_latest_test_run_endpoint(client: TestClient) -> None:
     # The sandbox fails-closed when Docker is unavailable in test environments.
     # Accept both passed (Docker present) and failed (Docker absent, fail-closed).
     assert data["status"] in ("passed", "failed")
-    assert data["testsGenerated"] > 0
+    if data["status"] == "failed":
+        # Honest fail-closed contract: no fake numbers when nothing executed.
+        assert data["testsGenerated"] == 0
+        assert data["testsPassed"] == 0
+        assert data["testsFailed"] == 0
+    else:
+        assert data["testsGenerated"] > 0
     assert data["target"] == 60.0
     assert "uncoveredLines" in data
     assert "failedTests" in data

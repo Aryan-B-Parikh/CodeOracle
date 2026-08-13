@@ -26,17 +26,24 @@ JSONB_VARIANT = postgresql.JSONB().with_variant(sa.JSON(), "sqlite")
 
 
 def upgrade() -> None:
-    op.execute("CREATE EXTENSION IF NOT EXISTS vector")
-    op.alter_column(
-        "chunks",
-        "embedding",
-        type_=Vector(_EMBEDDING_DIMENSIONS),
-        postgresql_using="embedding::text::vector",
-    )
-    op.execute(
-        "CREATE INDEX ix_chunks_embedding_hnsw ON chunks "
-        "USING hnsw (embedding vector_cosine_ops)"
-    )
+    bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        op.execute("CREATE EXTENSION IF NOT EXISTS vector")
+        op.alter_column(
+            "chunks",
+            "embedding",
+            type_=Vector(_EMBEDDING_DIMENSIONS),
+            postgresql_using="embedding::text::vector",
+        )
+        op.execute(
+            "CREATE INDEX ix_chunks_embedding_hnsw ON chunks "
+            "USING hnsw (embedding vector_cosine_ops)"
+        )
+    else:
+        # Non-PostgreSQL local dev databases keep the JSON fallback column.
+        # SQLite cannot ALTER a column type; the column is already a JSON
+        # (that is what 0007_chunks created), so nothing needs to change.
+        pass
 
     op.create_table(
         "embedding_cache",
@@ -59,10 +66,12 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index(op.f("ix_embedding_cache_content_hash"), table_name="embedding_cache")
     op.drop_table("embedding_cache")
-    op.execute("DROP INDEX IF EXISTS ix_chunks_embedding_hnsw")
-    op.alter_column(
-        "chunks",
-        "embedding",
-        type_=JSONB_VARIANT,
-        postgresql_using="embedding::text::jsonb",
-    )
+    bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        op.execute("DROP INDEX IF EXISTS ix_chunks_embedding_hnsw")
+        op.alter_column(
+            "chunks",
+            "embedding",
+            type_=JSONB_VARIANT,
+            postgresql_using="embedding::text::jsonb",
+        )

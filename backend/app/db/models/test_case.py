@@ -29,7 +29,9 @@ class TestCase(Base):
         Uuid, ForeignKey("entities.id"), nullable=True, index=True
     )
     status: Mapped[str] = mapped_column(String(16), default="passed")
-    coverage_line_nums: Mapped[list] = mapped_column(JSONVariant, default=list)
+    coverage_line_nums: Mapped[list | None] = mapped_column(
+        JSONVariant, nullable=True
+    )
     duration_ms: Mapped[int] = mapped_column(Integer, default=0)
 
     test_run: Mapped[TestRun] = relationship(back_populates="test_cases")

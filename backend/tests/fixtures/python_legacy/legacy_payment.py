@@ -5,7 +5,6 @@ globals (`TRANSACTIONS`, `FAILED_ATTEMPTS`), nested branches, magic
 numbers (10000, 5000), swallowed exceptions, and duplicate logic.
 """
 
-import utils
 
 TRANSACTIONS = []
 FAILED_ATTEMPTS = {"count": 0}

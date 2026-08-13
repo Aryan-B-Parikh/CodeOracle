@@ -8,14 +8,13 @@ quality-gate run.
 import uuid
 
 import pytest
-from sqlalchemy import text
-
 from app.db.models.chunk import Chunk
 from app.db.models.file import File
 from app.db.models.repository import Repository
 from app.db.session import Base, SessionLocal, engine
 from app.index.embeddings import get_embedder
 from app.index.service import search
+from sqlalchemy import text
 
 
 @pytest.fixture(scope="module", autouse=True)

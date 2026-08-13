@@ -1,5 +1,4 @@
 import pytest
-
 from tax import UnknownRegionError, calculate_tax
 
 

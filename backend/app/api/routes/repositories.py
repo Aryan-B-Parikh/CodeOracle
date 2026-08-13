@@ -12,7 +12,12 @@ from app.config import get_settings
 from app.db.models.analysis import Analysis
 from app.db.models.repository import Repository
 from app.db.session import get_db
-from app.schemas.repository import ImportRequest, RepositoryEnvelope, RepositoryOut
+from app.schemas.repository import (
+    ImportRequest,
+    RepositoryEnvelope,
+    RepositoryListEnvelope,
+    RepositoryOut,
+)
 from app.services.ingestion import ingest_git, ingest_zip, validate_git_url
 
 router = APIRouter()
@@ -88,6 +93,35 @@ def import_repository(
     workdir = _repository_workdir(repository.id)
     stored = ingest_git(db, repository, url, workdir)
     return RepositoryEnvelope(data=RepositoryOut.model_validate(stored))
+
+
+@router.get("/repositories", response_model=RepositoryListEnvelope)
+def list_repositories(db: DbSession) -> RepositoryListEnvelope:
+    """List recent repositories (name, id, language, coverage-relevant stats)."""
+    repositories = (
+        db.query(Repository).order_by(Repository.created_at.desc()).limit(50).all()
+    )
+    return RepositoryListEnvelope(
+        data=[
+            RepositoryOut(
+                id=repo.id,
+                name=repo.name,
+                source_type=repo.source_type,
+                github_url=repo.github_url,
+                languages=repo.languages,
+                language_counts=repo.language_counts,
+                loc=repo.loc,
+                entity_count=repo.entity_count,
+                file_count=repo.file_count,
+                warnings=repo.warnings,
+                status=repo.status,
+                analysis=None,
+                created_at=repo.created_at,
+                updated_at=repo.updated_at,
+            )
+            for repo in repositories
+        ]
+    )
 
 
 @router.get("/repositories/{repository_id}", response_model=RepositoryEnvelope)

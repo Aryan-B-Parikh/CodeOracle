@@ -461,6 +461,10 @@ def propose_refactor(
 
     try:
         resp = get_llm_gateway().complete(prompt=user_prompt, system=system_prompt)
+        if getattr(resp, "provider", None) == "mock":
+            raise RuntimeError(
+                "LLM unavailable (no API key configured); cannot generate a proposal."
+            )
         parsed = _parse_llm_json(resp.content)
         if parsed:
             rationale = [str(r) for r in parsed.get("rationale", [])]
@@ -469,22 +473,17 @@ def propose_refactor(
                 str(d) for d in parsed.get("behavioral_differences", [])
             ]
         else:
-            content = resp.content.strip()
-            if content:
-                rationale = ["LLM response was not valid JSON; raw proposal included."]
-                proposed_code = content
+            raise RuntimeError(
+                "LLM response was not valid JSON; refusing to present raw text "
+                "as an executable refactor proposal."
+            )
+    except RuntimeError:
+        raise
     except Exception as exc:  # noqa: BLE001
         logger.warning("LLM refactor call failed for %s: %s", entity.name, exc)
-        rationale = [
-            "LLM unavailable — structural refactor suggested based on static analysis.",
-            f"Entity has CCN complexity={entity.complexity}; consider extracting sub-functions.",
-        ]
-        if original_source and '"""' not in original_source:
-            lines = original_source.splitlines()
-            if lines:
-                indent = "    " if lines[0].startswith("    ") else ""
-                docstring_line = f'{indent}    """TODO: document {entity.name}."""'
-                proposed_code = "\n".join([lines[0], docstring_line] + lines[1:])
+        raise RuntimeError(
+            "LLM unavailable; no refactor proposal was generated."
+        ) from exc
 
     breaking_changes = detect_breaking_changes(db, entity, original_source, proposed_code)
 

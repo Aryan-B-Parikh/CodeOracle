@@ -59,6 +59,7 @@ class ExplanationData(BaseModel):
     entity: EntitySummary
     explanation: ExplanationFields
     evidence: list[EvidenceItem] = Field(default_factory=list)
+    provider: str | None = None
 
 
 ExplanationEnvelope = Envelope[ExplanationData]

@@ -6,8 +6,8 @@ with database's lazy import of `billing` (import cycle), and a
 high-complexity orchestrator (`calculate_invoice`).
 """
 
-import database
 import customer
+import database
 import tax
 
 

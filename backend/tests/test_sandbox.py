@@ -60,6 +60,189 @@ def test_staging_enforces_tests_size_limit(
         sandbox_stage.stage(source, "python", tests, tmp_path / "stage")
 
 
+def test_parse_tests_report_pytest_junit() -> None:
+    stdout = (
+        '<?xml version="1.0"?><testsuites><testsuite name="pytest" tests="3" '
+        'failures="1" errors="0" skipped="0">'
+        '<testcase name="test_a_main_branch" classname="test_generated" time="0.012"/>'
+        '<testcase name="test_b_main_branch" classname="test_generated" time="0.008">'
+        "<failure>assert 0 == 1</failure></testcase>"
+        '<testcase name="test_c_main_branch" classname="test_generated" time="0.021"/>'
+        "</testsuite></testsuites>"
+    )
+    report = sandbox_run.parse_tests_report(stdout)
+    assert report is not None
+    assert report["generated"] == 3
+    assert report["passed"] == 2
+    assert report["failed"] == 1
+    assert report["cases"][0] == {
+        "name": "test_a_main_branch",
+        "durationMs": 12,
+        "status": "passed",
+    }
+    assert report["cases"][1]["status"] == "failed"
+
+
+def test_parse_tests_report_surefire() -> None:
+    stdout = (
+        '<?xml version="1.0"?><testsuite name="GeneratedUnitTestSuite" tests="2" '
+        'failures="0" errors="0" skipped="0">'
+        '<testcase name="test_a_main_branch" classname="GeneratedUnitTestSuite" time="0.10"/>'
+        '<testcase name="test_b_main_branch" classname="GeneratedUnitTestSuite" time="0.20"/>'
+        "</testsuite>"
+    )
+    report = sandbox_run.parse_tests_report(stdout)
+    assert report is not None
+    assert report["generated"] == 2
+    assert report["passed"] == 2
+    assert report["failed"] == 0
+
+
+def test_parse_tests_report_missing_returns_none() -> None:
+    assert sandbox_run.parse_tests_report("no report here") is None
+    assert sandbox_run.parse_tests_report("") is None
+
+
+class _FakeFile:
+    def __init__(self, language: str, path: str) -> None:
+        self.language = language
+        self.path = path
+
+
+class _FakeEntity:
+    def __init__(self, language: str) -> None:
+        self.language = language
+
+
+class _FakeRepo:
+    def __init__(self, files: list, entities: list, languages: dict) -> None:
+        self.files = files
+        self.entities = entities
+        self.languages = languages
+
+
+def test_choose_language_java_repo_not_dict_order() -> None:
+    """Regression: a Java-only repo must run the Java/JUnit+JaCoCo path.
+
+    `repository.languages` always contains a key per supported language, so
+    iterating its keys always yielded 'python' and Java never executed.
+    """
+    from app.services.sandbox_runner import _choose_language
+
+    repo = _FakeRepo(
+        files=[_FakeFile("java", "src/App.java"), _FakeFile("java", "src/Util.java")],
+        entities=[_FakeEntity("java")],
+        languages={"python": False, "java": True, "other": False},
+    )
+    assert _choose_language(repo) == "java"
+
+
+def test_choose_language_python_default() -> None:
+    from app.services.sandbox_runner import _choose_language
+
+    repo = _FakeRepo(
+        files=[_FakeFile("python", "app.py")],
+        entities=[_FakeEntity("python")],
+        languages={"python": True, "java": False, "other": False},
+    )
+    assert _choose_language(repo) == "python"
+
+
+def test_choose_language_mixed_prefers_python() -> None:
+    from app.services.sandbox_runner import _choose_language
+
+    repo = _FakeRepo(
+        files=[
+            _FakeFile("java", "src/App.java"),
+            _FakeFile("python", "app.py"),
+            _FakeFile("python", "model.py"),
+        ],
+        entities=[],
+        languages={"python": True, "java": True, "other": False},
+    )
+    assert _choose_language(repo) == "python"
+
+
+def test_execute_sandbox_test_run_uses_reported_stats(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With a Docker run present, counts come from the junit/surefire report only."""
+    import uuid
+
+    from app.db.models.repository import Repository
+    from app.db.session import SessionLocal
+    from app.services import sandbox_runner
+    from app.services.sandbox_runner import execute_sandbox_test_run
+
+    monkeypatch.setattr(sandbox_runner, "is_docker_sandbox_ready", lambda: True)
+    monkeypatch.setattr(
+        sandbox_runner.sandbox_stage,
+        "stage",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        sandbox_runner.sandbox_run,
+        "run",
+        lambda *args, **kwargs: {
+            "exitCode": 0,
+            "timedOut": False,
+            "reason": "completed",
+            "coverage": {
+                "lineCoverage": 61.0,
+                "branchCoverage": 40.0,
+                "uncoveredLines": [],
+            },
+            "tests": {
+                "generated": 3,
+                "passed": 2,
+                "failed": 1,
+                "cases": [
+                    {"name": "test_a_main_branch", "durationMs": 12, "status": "passed"},
+                    {"name": "test_b_main_branch", "durationMs": 8, "status": "passed"},
+                    {"name": "test_c_main_branch", "durationMs": 21, "status": "failed"},
+                ],
+            },
+            "log": "",
+        },
+    )
+
+    with SessionLocal() as db:
+        repo = Repository(
+            id=uuid.uuid4(),
+            name="stats-repo",
+            source_type="zip",
+            languages={"python": True},
+            loc=100,
+        )
+        db.add(repo)
+        db.commit()
+
+        test_run = execute_sandbox_test_run(db, repo, test_code="def test_x(): pass\n")
+        assert test_run.status == "passed"
+        assert test_run.tests_generated == 3
+        assert test_run.tests_passed == 2
+        assert test_run.tests_failed == 1
+        assert test_run.line_coverage == 61.0
+        assert test_run.target_reached is True
+        assert len(test_run.failed_tests) == 1
+        assert test_run.failed_tests[0]["name"] == "test_c_main_branch"
+
+        from app.db.models.test_case import TestCase
+
+        cases = (
+            db.query(TestCase).filter(TestCase.test_run_id == test_run.id).all()
+        )
+        assert len(cases) == 3
+        assert {c.name for c in cases} == {
+            "test_a_main_branch",
+            "test_b_main_branch",
+            "test_c_main_branch",
+        }
+        assert {c.duration_ms for c in cases} == {12, 8, 21}
+        # Coverage lines are only stored when actually measured per test.
+        assert all(c.coverage_line_nums is None for c in cases)
+
+
 def _sandbox_ready() -> bool:
     if shutil.which("docker") is None:
         return False
@@ -135,10 +318,11 @@ def test_stderr_limit_kills_flood_fixture(tmp_path: Path) -> None:
 
 
 def test_execute_sandbox_test_run_service() -> None:
+    import uuid
+
     from app.db.models.repository import Repository
     from app.db.session import SessionLocal
     from app.services.sandbox_runner import execute_sandbox_test_run
-    import uuid
 
     with SessionLocal() as db:
         repo = Repository(

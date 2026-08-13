@@ -7,14 +7,16 @@ the coverage loop must take line coverage from a low baseline to **> 60%**.
 
 | Metric | Value |
 |---|---|
-| Baseline coverage (first generation pass) | ~30–40% |
+| Baseline coverage (seed suite, committed) | ~40–50% (measured 45.7% with pytest + coverage.py) |
 | Target | **> 60%** line coverage |
 | Maximum repair iterations | 3 |
-| Expected final | **> 60%** |
+| Expected final | **> 60%** (measured 94.3%) |
 
-The repo intentionally ships **without committed tests** so the baseline is low
-and the Test → Coverage → Repair loop has clear headroom. Do not add committed
-tests here — that would defeat the demo.
+The repo ships with a deliberately *partial* seed suite (`python/tests/`) so the
+baseline is low and the Test → Coverage → Repair loop has clear headroom. The
+seed suite is the baseline fixture; the benchmark's three repair additions are
+not committed — they are written to `tests/test_generated_repair.py` by the
+benchmark run and cleaned up afterwards.
 
 ## Contents
 

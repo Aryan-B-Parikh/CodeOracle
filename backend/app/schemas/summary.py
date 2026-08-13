@@ -53,6 +53,7 @@ class AnalysisSummaryPayload(BaseModel):
 
     summary: RepositorySummaryData
     high_risk_entities: list[HighRiskEntity] = Field(default_factory=list)
+    provider: str | None = None
 
 
 SummaryEnvelope = Envelope[AnalysisSummaryPayload]
@@ -73,6 +74,7 @@ class ModuleSummaryItem(BaseModel):
     dependencies: list[str] = Field(default_factory=list)
     evidence: list[EvidenceItem] = Field(default_factory=list)
     summary: str
+    provider: str | None = None
 
 
 ModuleSummaryEnvelope = Envelope[list[ModuleSummaryItem]]

@@ -1,8 +1,12 @@
-"""Run the Python legacy-code coverage benchmark without Docker.
+"""Run the Python legacy-code coverage benchmark (demo-repo sanity check).
 
-The benchmark starts with a deliberately partial seed suite, measures real
-coverage.py output, then adds focused tests in three repair iterations and
-verifies that line coverage exceeds the 60% acceptance threshold.
+Measures, with real pytest + coverage.py output, that the committed seed suite
+starts at a low baseline and that three focused repair test additions take the
+demo repo's line coverage above the 60% acceptance threshold.
+
+This verifies the demo repo's coverage contract (baseline low -> >60%). The
+CodeOracle pipeline's own repair loop (LLM generation + sandbox execution +
+iteration) is exercised by backend/tests/test_repair.py and the CI Docker job.
 """
 
 from __future__ import annotations
@@ -47,8 +51,10 @@ REPAIR_ITERATIONS = [
 def main() -> int:
     baseline = run_pytest()
     print(f"BASELINE_COVERAGE={baseline:.1f}%")
-    if not 20.0 <= baseline < 50.0:
-        raise AssertionError(f"Expected a partial baseline below 50%; measured {baseline:.1f}%")
+    if not 25.0 <= baseline < 55.0:
+        raise AssertionError(
+            f"Expected a partial baseline between 25-55%; measured {baseline:.1f}%"
+        )
 
     try:
         for iteration, test_code in enumerate(REPAIR_ITERATIONS, start=1):

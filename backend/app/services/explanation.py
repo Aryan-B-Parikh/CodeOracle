@@ -57,34 +57,37 @@ def _extract_evidence_from_snippet(
     snippet_lines: SnippetLines,
     rel_path: str,
     target_name: str,
+    line_start: int,
+    line_end: int,
 ) -> list[EvidenceItem]:
-    """Generate default evidence items from target source lines if LLM evidence is missing."""
+    """Build default evidence items directly from the source lines (no invented claims)."""
     evidence: list[EvidenceItem] = []
     if not snippet_lines:
         return evidence
 
-    for line_no, line in snippet_lines:
+    for line_no, line in snippet_lines[:6]:
         stripped = line.strip()
-        if stripped.startswith("if ") or "if exempt" in stripped:
-            evidence.append(
-                EvidenceItem(
-                    claim="Exempt purchases incur no tax.",
-                    file=rel_path,
-                    line_start=line_no,
-                    line_end=line_no + 1 if len(snippet_lines) > 1 else line_no,
-                    code=stripped,
-                )
+        if not stripped:
+            continue
+        if stripped.startswith("if ") or stripped.startswith("elif "):
+            claim = f"Conditional control flow at line {line_no}."
+        elif stripped.startswith(("def ", "class ", "async def ")):
+            claim = f"Declares {target_name} at line {line_no}."
+        elif "return " in stripped:
+            claim = f"Returns a value at line {line_no}."
+        elif "raise " in stripped:
+            claim = f"Raises an exception at line {line_no}."
+        else:
+            claim = f"Code at line {line_no}."
+        evidence.append(
+            EvidenceItem(
+                claim=claim,
+                file=rel_path,
+                line_start=line_no,
+                line_end=line_no,
+                code=stripped,
             )
-        elif "round(" in stripped or "TAX_RATES[" in stripped:
-            evidence.append(
-                EvidenceItem(
-                    claim="Applies region tax rate rounded to 2 decimal places.",
-                    file=rel_path,
-                    line_start=line_no,
-                    line_end=line_no,
-                    code=stripped,
-                )
-            )
+        )
 
     if not evidence:
         first_line = snippet_lines[0][0]
@@ -94,8 +97,8 @@ def _extract_evidence_from_snippet(
             EvidenceItem(
                 claim=f"Implementation of {target_name}.",
                 file=rel_path,
-                line_start=first_line,
-                line_end=last_line,
+                line_start=max(first_line, line_start),
+                line_end=min(last_line, line_end),
                 code=code,
             )
         )
@@ -185,161 +188,161 @@ def generate_explanation(
     system_prompt = secure_system_prompt(EXPLANATION_SYSTEM)
 
     llm_gateway = get_llm_gateway()
+    provider_name = getattr(getattr(llm_gateway, "provider", None), "provider_name", None)
+    has_real_llm = provider_name not in ("mock", None)
 
     explanation_fields: ExplanationFields
     evidence_items: list[EvidenceItem] = []
 
-    try:
-        raw_response = llm_gateway.complete_json(prompt=user_prompt, system=system_prompt)
-        exp_dict = raw_response.get("explanation", raw_response)
-
-        purpose = str(
-            exp_dict.get("purpose") or exp_dict.get("1. Purpose") or ""
-        ).strip()
-        inputs = str(exp_dict.get("inputs") or exp_dict.get("2. Inputs") or "").strip()
-        outputs = str(exp_dict.get("outputs") or exp_dict.get("3. Outputs") or "").strip()
-        side_effects = str(
-            exp_dict.get("sideEffects")
-            or exp_dict.get("side_effects")
-            or exp_dict.get("4. Side effects")
-            or ""
-        ).strip()
-        dependencies = str(
-            exp_dict.get("dependencies") or exp_dict.get("5. Dependencies") or ""
-        ).strip()
-        control_flow = str(
-            exp_dict.get("controlFlow")
-            or exp_dict.get("control_flow")
-            or exp_dict.get("6. Control flow")
-            or ""
-        ).strip()
-        error_handling = str(
-            exp_dict.get("errorHandling")
-            or exp_dict.get("error_handling")
-            or exp_dict.get("7. Error handling")
-            or ""
-        ).strip()
-        business_rules = str(
-            exp_dict.get("businessRules")
-            or exp_dict.get("business_rules")
-            or exp_dict.get("8. Business rules")
-            or ""
-        ).strip()
-        complexity_val = (
-            exp_dict.get("complexity")
-            or exp_dict.get("9. Complexity")
-            or entity.complexity
-        )
+    if has_real_llm:
         try:
-            complexity_num = int(complexity_val)
-        except (ValueError, TypeError):
-            complexity_num = entity.complexity
-        risks = str(exp_dict.get("risks") or exp_dict.get("10. Risks") or "").strip()
+            raw_response = llm_gateway.complete_json(prompt=user_prompt, system=system_prompt)
+            exp_dict = raw_response.get("explanation", raw_response)
 
-        if not purpose or purpose.startswith("Mock response"):
-            purpose = f"Calculates or processes logic for {entity.name}."
-            if "tax" in entity.name:
-                purpose = (
-                    "Calculates sales tax for an amount based on the region's tax rate."
-                )
-        if not inputs:
-            args = meta.get("arguments", [])
-            inputs = ", ".join(args) if args else "None"
-            if entity.name == "calculate_tax":
-                inputs = "amount (float), region (str), exempt (bool, default False)"
-        if not outputs:
-            default_out = "float" if "tax" in entity.name else "Value or None"
-            outputs = meta.get("return_type") or default_out
-            if entity.name == "calculate_tax":
-                outputs = "float — rounded to 2 decimals"
-        if not side_effects:
-            side_effects = "None"
-        if not dependencies:
-            deps = [c.callee_name for c in calls_made]
-            dependencies = ", ".join(deps) if deps else "None"
-            if entity.name == "calculate_tax":
-                dependencies = "TAX_RATES map; get_tax_rate raises UnknownRegionError"
-        if not control_flow:
-            control_flow = "Sequential execution of statements."
-            if entity.name == "calculate_tax":
-                control_flow = (
-                    "If exempt, returns 0.0 immediately; otherwise looks up the region "
-                    "rate and applies it."
-                )
-        if not error_handling:
-            error_handling = "Propagates exceptions to caller."
-            if entity.name == "calculate_tax":
-                error_handling = (
-                    "Unknown regions raise UnknownRegionError via get_tax_rate."
-                )
-        if not business_rules:
-            business_rules = f"Applies core business logic for {entity.name}."
-            if entity.name == "calculate_tax":
+            purpose = str(
+                exp_dict.get("purpose") or exp_dict.get("1. Purpose") or ""
+            ).strip()
+            inputs = str(exp_dict.get("inputs") or exp_dict.get("2. Inputs") or "").strip()
+            outputs = str(exp_dict.get("outputs") or exp_dict.get("3. Outputs") or "").strip()
+            side_effects = str(
+                exp_dict.get("sideEffects")
+                or exp_dict.get("side_effects")
+                or exp_dict.get("4. Side effects")
+                or ""
+            ).strip()
+            dependencies = str(
+                exp_dict.get("dependencies") or exp_dict.get("5. Dependencies") or ""
+            ).strip()
+            control_flow = str(
+                exp_dict.get("controlFlow")
+                or exp_dict.get("control_flow")
+                or exp_dict.get("6. Control flow")
+                or ""
+            ).strip()
+            error_handling = str(
+                exp_dict.get("errorHandling")
+                or exp_dict.get("error_handling")
+                or exp_dict.get("7. Error handling")
+                or ""
+            ).strip()
+            business_rules = str(
+                exp_dict.get("businessRules")
+                or exp_dict.get("business_rules")
+                or exp_dict.get("8. Business rules")
+                or ""
+            ).strip()
+            complexity_val = (
+                exp_dict.get("complexity")
+                or exp_dict.get("9. Complexity")
+                or entity.complexity
+            )
+            try:
+                complexity_num = int(complexity_val)
+            except (ValueError, TypeError):
+                complexity_num = entity.complexity
+            risks = str(exp_dict.get("risks") or exp_dict.get("10. Risks") or "").strip()
+
+            if not purpose:
+                purpose = f"Performs the {entity.type} '{entity.name}' logic."
+            if not inputs:
+                args = meta.get("arguments", [])
+                inputs = ", ".join(str(a) for a in args) if args else "None"
+            if not outputs:
+                outputs = meta.get("return_type") or "Value or None"
+            if not side_effects:
+                side_effects = "None detected from static analysis."
+            if not dependencies:
+                deps = [c.callee_name for c in calls_made]
+                dependencies = ", ".join(deps) if deps else "None (leaf function)"
+            if not control_flow:
+                control_flow = "Control flow as structured in the source (see evidence)."
+            if not error_handling:
+                error_handling = "Propagates exceptions to the caller."
+            if not business_rules:
                 business_rules = (
-                    "Exempt purchases incur no tax; rates are US 8%, UK 20%, IN 5%."
+                    f"Business logic implemented by {entity.name} per source "
+                    f"lines {entity.line_start}-{entity.line_end}."
                 )
-        if not risks:
-            risks = "Relying on parameters and dynamic execution."
-            if entity.name == "calculate_tax":
-                risks = (
-                    "Relying on a mutable module-level rate table; "
-                    "unknown-region path is an error case."
-                )
+            if not risks:
+                risks = "Behavior inferred from static analysis; verify at runtime."
 
-        explanation_fields = ExplanationFields(
-            purpose=purpose,
-            inputs=inputs,
-            outputs=outputs,
-            side_effects=side_effects,
-            dependencies=dependencies,
-            control_flow=control_flow,
-            error_handling=error_handling,
-            business_rules=business_rules,
-            complexity=complexity_num,
-            risks=risks,
-        )
+            explanation_fields = ExplanationFields(
+                purpose=purpose,
+                inputs=inputs,
+                outputs=outputs,
+                side_effects=side_effects,
+                dependencies=dependencies,
+                control_flow=control_flow,
+                error_handling=error_handling,
+                business_rules=business_rules,
+                complexity=complexity_num,
+                risks=risks,
+            )
 
-        raw_evidence = raw_response.get("evidence", [])
-        if isinstance(raw_evidence, list):
-            for item in raw_evidence:
-                if isinstance(item, dict) and "claim" in item:
-                    start_l = int(
-                        item.get("lineStart")
-                        or item.get("line_start")
-                        or entity.line_start
-                    )
-                    end_l = int(
-                        item.get("lineEnd")
-                        or item.get("line_end")
-                        or entity.line_end
-                    )
-                    evidence_items.append(
-                        EvidenceItem(
-                            claim=str(item.get("claim", "")),
-                            file=str(item.get("file") or rel_path),
-                            line_start=start_l,
-                            line_end=end_l,
-                            code=str(item.get("code", "")),
+            raw_evidence = raw_response.get("evidence", [])
+            if isinstance(raw_evidence, list):
+                for item in raw_evidence:
+                    if isinstance(item, dict) and "claim" in item:
+                        start_l = int(
+                            item.get("lineStart")
+                            or item.get("line_start")
+                            or entity.line_start
                         )
-                    )
-    except Exception as exc:
-        logger.info("LLM gateway JSON extraction fallback: %s", exc)
+                        end_l = int(
+                            item.get("lineEnd")
+                            or item.get("line_end")
+                            or entity.line_end
+                        )
+                        evidence_items.append(
+                            EvidenceItem(
+                                claim=str(item.get("claim", "")),
+                                file=str(item.get("file") or rel_path),
+                                line_start=start_l,
+                                line_end=end_l,
+                                code=str(item.get("code", "")),
+                            )
+                        )
+        except Exception as exc:
+            logger.info("LLM gateway JSON extraction fallback: %s", exc)
+            arguments = meta.get("arguments", [])
+            deps = [c.callee_name for c in calls_made]
+            explanation_fields = ExplanationFields(
+                purpose=f"Performs the {entity.type} '{entity.name}' logic.",
+                inputs=", ".join(str(a) for a in arguments) if arguments else "None",
+                outputs=meta.get("return_type") or "Any",
+                side_effects="None detected from static analysis.",
+                dependencies=", ".join(deps) if deps else "None (leaf function)",
+                control_flow="Standard control flow.",
+                error_handling="Propagates exceptions.",
+                business_rules=f"Applies business rules for {entity.name}.",
+                complexity=entity.complexity,
+                risks="Low risk.",
+            )
+    else:
+        arguments = meta.get("arguments", [])
+        deps = [c.callee_name for c in calls_made]
         explanation_fields = ExplanationFields(
-            purpose=f"Executes core functionality of {entity.name}.",
-            inputs=", ".join(meta.get("arguments", [])) or "None",
+            purpose=(
+                f"Performs the {entity.type} '{entity.name}' logic at "
+                f"{rel_path}:{entity.line_start}-{entity.line_end}."
+            ),
+            inputs=", ".join(str(a) for a in arguments) if arguments else "None",
             outputs=meta.get("return_type") or "Any",
-            side_effects="None",
-            dependencies=", ".join(c.callee_name for c in calls_made) or "None",
-            control_flow="Standard control flow.",
-            error_handling="Propagates exceptions.",
-            business_rules=f"Applies business rules for {entity.name}.",
+            side_effects="None detected from static analysis.",
+            dependencies=", ".join(deps) if deps else "None (leaf function)",
+            control_flow="Control flow as structured in the source (see evidence).",
+            error_handling="Propagates exceptions or relies on callee error semantics.",
+            business_rules=(
+                f"Business logic implemented by {entity.name} per source "
+                f"lines {entity.line_start}-{entity.line_end}."
+            ),
             complexity=entity.complexity,
-            risks="Low risk.",
+            risks="Behavior inferred from static analysis; verify against runtime semantics.",
         )
 
     if not evidence_items:
         evidence_items = _extract_evidence_from_snippet(
-            snippet_lines, rel_path, entity.name
+            snippet_lines, rel_path, entity.name, entity.line_start, entity.line_end
         )
 
     entity_summary = EntitySummary(
@@ -355,4 +358,5 @@ def generate_explanation(
         entity=entity_summary,
         explanation=explanation_fields,
         evidence=evidence_items,
+        provider=provider_name,
     )

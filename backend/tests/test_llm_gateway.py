@@ -1,11 +1,9 @@
 """Unit tests for provider-agnostic LLM gateway (T-09)."""
 
-import json
 from unittest.mock import MagicMock
 
 import httpx
 import pytest
-
 from app.config import Settings
 from app.llm import (
     AnthropicProvider,

@@ -47,6 +47,37 @@ jobs:
         run: pytest backend/tests
       - name: PostgreSQL + pgvector integration tests
         run: pytest backend/tests/test_pgvector.py -q
+      - name: Coverage benchmark (demo repo, real pytest + coverage.py)
+        run: python benchmark/legacy_demo/python/run_benchmark.py
+
+  sandbox:
+    name: Docker sandbox integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - name: Install dependencies
+        run: pip install -r backend/requirements-dev.txt
+      - name: Build sandbox image
+        working-directory: backend/sandbox
+        run: docker build -t codeoracle/sandbox:latest .
+      - name: Sandbox smoke test (Python)
+        working-directory: backend/sandbox
+        run: |
+          python run.py --language python --source ../../benchmark/legacy_demo/python/expense \
+            --tests ../../benchmark/legacy_demo/python/tests
+      - name: Sandbox smoke test (Java)
+        working-directory: backend/sandbox
+        run: |
+          python run.py --language java --source ../../benchmark/legacy_demo/java/expenses
+      - name: Pipeline test-generation + repair integration (Docker present)
+        run: pytest backend/tests/test_repair.py backend/tests/test_sandbox.py -q
+        env:
+          DATABASE_URL: sqlite://
 
   frontend:
     name: Frontend quality gates
@@ -69,3 +100,5 @@ jobs:
         run: npm run typecheck
       - name: Tests (vitest)
         run: npm run test
+      - name: Production build
+        run: npm run build

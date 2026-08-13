@@ -222,6 +222,7 @@ def generate_repository_summary(
     system_prompt = secure_system_prompt(REPOSITORY_SUMMARY_SYSTEM)
 
     llm_gateway = get_llm_gateway()
+    provider_name = getattr(getattr(llm_gateway, "provider", None), "provider_name", None)
     overview_text: str | None = None
     try:
         resp = llm_gateway.complete(prompt=user_prompt, system=system_prompt)
@@ -242,6 +243,7 @@ def generate_repository_summary(
     payload = AnalysisSummaryPayload(
         summary=summary_data,
         high_risk_entities=high_risk,
+        provider=provider_name,
     )
 
     latest_analysis = (
@@ -285,6 +287,7 @@ def generate_module_summaries(
     items: list[ModuleSummaryItem] = []
     root_dir = repository_root(repository)
     llm_gateway = get_llm_gateway()
+    provider_name = getattr(getattr(llm_gateway, "provider", None), "provider_name", None)
 
     for file_row in repository.files:
         if "test" in file_row.path.lower() or "conftest" in file_row.path.lower():
@@ -415,6 +418,7 @@ def generate_module_summaries(
                 dependencies=dependencies,
                 evidence=evidence_items,
                 summary=summary_text,
+                provider=provider_name,
             )
         )
     return items

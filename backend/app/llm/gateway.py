@@ -87,7 +87,9 @@ def estimate_tokens(text: str, model: str = "") -> int:
             except KeyError:
                 encoding = tiktoken.get_encoding("cl100k_base")
             return len(encoding.encode(text))
-        except ImportError:
+        except Exception:
+            # Import or network failures (encoding download) fall back to the
+            # code-aware heuristic so token estimation never blocks a call.
             pass
 
     return _heuristic_token_count(text)

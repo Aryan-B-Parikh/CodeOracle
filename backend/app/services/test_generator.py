@@ -14,7 +14,6 @@ from sqlalchemy.orm import Session
 
 from app.db.models.entity import Entity
 from app.db.models.repository import Repository
-from app.db.models.test_case import TestCase
 from app.llm import get_llm_gateway
 from app.llm.prompts.test_generation import (
     TEST_GENERATION_SYSTEM,
@@ -48,6 +47,17 @@ def _is_valid_python(code: str) -> bool:
         ast.parse(code)
         return True
     except SyntaxError:
+        return False
+
+
+def _is_valid_java(code: str) -> bool:
+    """Verify that Java test code parses cleanly with the production tree-sitter parser."""
+    from app.analyzers.java_parser import parse_java
+
+    try:
+        parse_java(code, "GeneratedTest.java")
+        return True
+    except Exception:
         return False
 
 
@@ -258,7 +268,12 @@ def generate_unit_tests(
         resp = get_llm_gateway().complete(prompt=user_prompt, system=system_prompt)
         cleaned = _clean_code_fences(resp.content)
         is_py = main_lang == "python" and _is_valid_python(cleaned) and "def test_" in cleaned
-        is_java = main_lang in ("java", "junit") and "class " in cleaned and "@Test" in cleaned
+        is_java = (
+            main_lang in ("java", "junit")
+            and "class " in cleaned
+            and "@Test" in cleaned
+            and _is_valid_java(cleaned)
+        )
         if is_py or is_java:
             generated_code = cleaned
     except Exception as exc:
@@ -275,29 +290,6 @@ def generate_unit_tests(
 
     test_run = execute_sandbox_test_run(db=db, repository=repository, test_code=generated_code)
     target_func_names = [e.name for e in target_entities]
-    for e in target_entities:
-        db.add(
-            TestCase(
-                test_run_id=test_run.id,
-                name=f"test_{e.name}_main_branch",
-                target_entity_id=e.id,
-                status="passed" if test_run.status == "passed" else "failed",
-                coverage_line_nums=list(range(e.line_start, e.line_end + 1)),
-                duration_ms=12,
-            )
-        )
-        db.add(
-            TestCase(
-                test_run_id=test_run.id,
-                name=f"test_{e.name}_exception_path",
-                target_entity_id=e.id,
-                status="passed" if test_run.status == "passed" else "failed",
-                coverage_line_nums=[e.line_start],
-                duration_ms=8,
-            )
-        )
-    db.commit()
-
     return GenerateTestCodeResponse(
         repository_id=repository.id,
         language=main_lang,
@@ -418,7 +410,10 @@ def generate_uncovered_tests(
         try:
             resp = get_llm_gateway().complete(prompt=user_prompt, system=system_prompt)
             cleaned = _clean_code_fences(resp.content)
-            if "def test_" in cleaned or "@Test" in cleaned:
+            if main_lang == "python":
+                if "def test_" in cleaned and _is_valid_python(cleaned):
+                    additional_code = cleaned
+            elif "@Test" in cleaned and _is_valid_java(cleaned):
                 additional_code = cleaned
         except Exception as exc:
             logger.info("LLM test repair fallback triggered: %s", exc)

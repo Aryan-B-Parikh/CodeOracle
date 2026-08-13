@@ -5,8 +5,6 @@ import uuid
 import zipfile
 from pathlib import Path
 
-from fastapi.testclient import TestClient
-
 from app.db.models.call import Call
 from app.db.models.entity import Entity
 from app.db.models.file import File
@@ -15,6 +13,7 @@ from app.db.models.inheritance import Inheritance
 from app.db.models.repository import Repository
 from app.db.session import SessionLocal
 from app.services.analysis import analyze_repository
+from fastapi.testclient import TestClient
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 

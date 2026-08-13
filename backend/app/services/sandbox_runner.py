@@ -6,11 +6,15 @@ import logging
 import shutil
 import sys
 import tempfile
+import uuid
+from collections import Counter
 from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from app.db.models.entity import Entity
 from app.db.models.repository import Repository
+from app.db.models.test_case import TestCase
 from app.db.models.test_run import TestRun
 from app.services.analysis import repository_root
 
@@ -27,6 +31,55 @@ except Exception:
     _SANDBOX_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
+
+LANGS = ("python", "java")
+
+
+def _choose_language(repository: Repository) -> str:
+    """Pick the execution language from actual source files, not dict key order.
+
+    ``repository.languages`` always contains an entry per supported language
+    (plus ``other``), so its key order is meaningless. This uses the same
+    logic as the test generator: majority of non-test source files.
+    """
+    file_languages = [
+        f.language
+        for f in repository.files
+        if f.language in LANGS and "test" not in f.path.lower()
+    ]
+    if not file_languages:
+        entity_languages = [
+            e.language for e in repository.entities if e.language in LANGS
+        ]
+        file_languages = entity_languages
+    if not file_languages:
+        present = [
+            lang for lang in LANGS if repository.languages.get(lang, False)
+        ]
+        if present:
+            return present[0]
+        return "python"
+    counts = Counter(file_languages)
+    return max(counts, key=lambda lang: (counts[lang], lang == "python"))
+
+
+def _match_target_entity(
+    db: Session, repository_id: uuid.UUID, case_name: str
+) -> str | None:
+    """Best-effort link: junitxml case names are ``test_<entity>_...``."""
+    tail = case_name[len("test_") :] if case_name.startswith("test_") else case_name
+    for sep in ("_main_branch", "_exception_path", "_uncovered"):
+        if sep in tail:
+            tail = tail.split(sep)[0]
+            break
+    else:
+        tail = tail.split("_")[0]
+    entity = (
+        db.query(Entity)
+        .filter(Entity.repository_id == repository_id, Entity.name == tail)
+        .first()
+    )
+    return str(entity.id) if entity else None
 
 
 def is_docker_sandbox_ready() -> bool:
@@ -52,17 +105,17 @@ def execute_sandbox_test_run(
     test_code: str | None = None,
     timeout: int = 60,
 ) -> TestRun:
-    """Execute tests inside the hardened Docker sandbox and capture coverage metrics."""
-    lang = (
-        list(repository.languages.keys())[0].lower()
-        if repository.languages
-        else "python"
-    )
-    language = "java" if lang in ("java", "junit") else "python"
+    """Execute tests inside the hardened Docker sandbox and capture coverage metrics.
+
+    Test counts and per-testcase records come from the runner's junit/surefire
+    report (``pytest --junitxml`` / Maven surefire); nothing is derived arithmetically.
+    """
+    language = _choose_language(repository)
     try:
         root_dir = repository_root(repository)
     except Exception:
         from app.config import get_settings
+
         root_dir = get_settings().upload_dir / str(repository.id)
         root_dir.mkdir(parents=True, exist_ok=True)
 
@@ -77,6 +130,7 @@ def execute_sandbox_test_run(
             )
             (tests_dir / test_file_name).write_text(test_code, encoding="utf-8")
 
+        tests_report: dict | None = None
         timed_out = False
         exit_code = 0
         reason = "completed"
@@ -99,6 +153,11 @@ def execute_sandbox_test_run(
                     if isinstance(run_res.get("coverage"), dict)
                     else None
                 )
+                tests_report = (
+                    run_res.get("tests")
+                    if isinstance(run_res.get("tests"), dict)
+                    else None
+                )
                 log_output = str(run_res.get("log", ""))
             except Exception as exc:
                 logger.warning("Docker sandbox run exception: %s", exc)
@@ -108,15 +167,6 @@ def execute_sandbox_test_run(
             logger.warning("Docker sandbox unavailable; failing test run closed")
             exit_code = 125
             reason = "Docker daemon unavailable (sandbox environment requirement)"
-            coverage_data = {
-                "lineCoverage": 0.0,
-                "branchCoverage": 0.0,
-                "uncoveredLines": [
-                    {"file": f.path, "line": 1, "branch": False}
-                    for f in repository.files
-                    if "test" not in f.path.lower()
-                ][:5],
-            }
             log_output = (
                 "Execution failed closed: Docker sandbox daemon is offline or image missing."
             )
@@ -137,12 +187,29 @@ def execute_sandbox_test_run(
         )
         target_reached = (line_coverage >= 60.0) and is_passed
 
-        tests_generated = len(repository.entities) * 2 if repository.entities else 2
-        tests_passed = tests_generated if is_passed else max(0, tests_generated - 1)
-        tests_failed = 0 if is_passed else 1
+        cases = (
+            tests_report.get("cases", [])
+            if isinstance(tests_report, dict)
+            and isinstance(tests_report.get("cases"), list)
+            else []
+        )
+        tests_generated = int(tests_report.get("generated", 0)) if tests_report else 0
+        tests_passed = sum(1 for c in cases if c.get("status") == "passed")
+        tests_failed = sum(1 for c in cases if c.get("status") == "failed")
+        if not cases and tests_report:
+            tests_passed = int(tests_report.get("passed", 0))
+            tests_failed = int(tests_report.get("failed", 0))
 
-        failed_tests = []
-        if not is_passed:
+        failed_tests = [
+            {
+                "name": str(c.get("name", "")),
+                "targetEntity": _match_target_entity(db, repository.id, str(c.get("name", ""))),
+                "message": f"Test failed (exit code {exit_code}, reason: {reason})",
+            }
+            for c in cases
+            if c.get("status") == "failed"
+        ]
+        if not is_passed and not failed_tests and status == "failed" and cases:
             failed_tests.append(
                 {
                     "name": "sandbox_execution",
@@ -170,5 +237,20 @@ def execute_sandbox_test_run(
         db.add(test_run)
         db.commit()
         db.refresh(test_run)
+
+        for case in cases:
+            db.add(
+                TestCase(
+                    test_run_id=test_run.id,
+                    name=str(case.get("name", "unknown")),
+                    target_entity_id=_match_target_entity(
+                        db, repository.id, str(case.get("name", ""))
+                    ),
+                    status=str(case.get("status", "passed")),
+                    coverage_line_nums=None,
+                    duration_ms=int(case.get("durationMs", 0)),
+                )
+            )
+        db.commit()
 
         return test_run

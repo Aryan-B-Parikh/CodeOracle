@@ -4,18 +4,18 @@
 
 ## Phase 0 — Project scaffold
 
-- [ ] **T-01** Repo layout + CI
+- [x] **T-01** Repo layout + CI
   - **AC:** `backend/`, `frontend/`, `docs/` scaffolded; ruff/mypy/pytest and eslint/prettier/typecheck wired; CI runs all gates on push; docs referenced from README.
-- [ ] **T-02** Docker sandbox image
+- [x] **T-02** Docker sandbox image
   - **AC:** Image builds; runs `pytest --cov` and `mvn test` on a fixture repo; enforces CPU/memory limit and timeout; returns coverage output as JSON.
 
 ## Phase 1 — Core ingestion
 
-- [ ] **T-03** Repository scanner (upload + GitHub import)
+- [x] **T-03** Repository scanner (upload + GitHub import)
   - **AC:** `POST /api/v1/repositories/upload` (ZIP) and `POST /api/v1/repositories/import` (`github_url`) create a `repositories` row; language detection correct on mixed repos; unsupported language → `other` with warning, not failure.
-- [ ] **T-04** Python AST analyzer
+- [x] **T-04** Python AST analyzer
   - **AC:** Extracts functions/methods/classes, signatures, `line_start/end`, calls (resolved to local entities where possible), imports, globals usage; complexity (Radon CCN) matches manual count on 3 fixture files.
-- [ ] **T-05** Java parser (tree-sitter-java)
+- [x] **T-05** Java parser (tree-sitter-java)
   - **AC:** Same extraction coverage as T-04 for Java fixtures (methods, classes, calls, imports, complexity).
 - [x] **T-06** Dependency graph builder (NetworkX)
   - **AC:** Repository→package→module→class→function→call graph correct on fixtures; circular-dependency detection; high-risk nodes (high complexity × many callers) computed; `GET .../graph` returns React Flow `nodes`/`edges`.
