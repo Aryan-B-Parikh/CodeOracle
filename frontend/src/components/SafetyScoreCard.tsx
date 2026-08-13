@@ -47,15 +47,29 @@ export const SafetyScoreCard: React.FC<SafetyScoreCardProps> = ({
             <span style={styles.scoreMax}>/100</span>
           </div>
 
-          <span
-            style={{
-              ...styles.riskBadge,
-              backgroundColor: badgeColor,
-            }}
-            data-testid="risk-level-badge"
-          >
-            {safetyData.riskLevel.toUpperCase()} RISK
-          </span>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <span
+              style={{
+                ...styles.riskBadge,
+                backgroundColor: badgeColor,
+              }}
+              data-testid="risk-level-badge"
+            >
+              {safetyData.riskLevel.toUpperCase()} RISK
+            </span>
+
+            {safetyData.confidenceScore !== undefined && (
+              <span
+                style={{
+                  ...styles.riskBadge,
+                  backgroundColor: '#0284c7',
+                }}
+                data-testid="confidence-badge"
+              >
+                CONFIDENCE: {safetyData.confidenceScore}%
+              </span>
+            )}
+          </div>
         </div>
       </div>
 

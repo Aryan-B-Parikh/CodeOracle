@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import logging
 import re
+import uuid
 
 from sqlalchemy.orm import Session
 
@@ -164,21 +166,41 @@ def calculate_safety_score(
             api_penalty += 5
     api_compatibility = max(0, 100 - api_penalty)
 
+    original_checksum = (
+        proposal_record.original_checksum or hashlib.sha256(original_code.encode()).hexdigest()
+    )
+    proposed_checksum = hashlib.sha256(proposed_code.encode()).hexdigest()
+
     latest_run = (
         db.query(TestRun)
         .filter(TestRun.repository_id == repository.id)
         .order_by(TestRun.created_at.desc())
         .first()
     )
+    test_run_id: uuid.UUID | None = None
     if latest_run is not None:
+        test_run_id = latest_run.id
         if latest_run.status == "passed" and latest_run.target_reached:
             test_compatibility = 100
+            confidence_score = 95
+            confidence_level = "high"
+            behavior_status = "BEHAVIOR_PRESERVED"
         elif latest_run.status == "passed":
             test_compatibility = 80
+            confidence_score = 80
+            confidence_level = "high"
+            behavior_status = "BEHAVIOR_PRESERVED"
         else:
-            test_compatibility = 40
+            test_compatibility = 30
+            confidence_score = 50
+            confidence_level = "medium"
+            behavior_status = "BEHAVIOR_MUTATED"
     else:
-        test_compatibility = 75
+        # Priority 1: Absence of evidence produces 0% / UNKNOWN test compatibility
+        test_compatibility = 0
+        confidence_score = 35
+        confidence_level = "low"
+        behavior_status = "UNVERIFIED"
 
     caller_count = (
         db.query(Call)
@@ -201,7 +223,7 @@ def calculate_safety_score(
     )
     total = max(0, min(100, total))
 
-    if total >= 80:
+    if total >= 80 and confidence_level != "low":
         risk_level = "low"
     elif total >= 50:
         risk_level = "medium"
@@ -209,6 +231,11 @@ def calculate_safety_score(
         risk_level = "high"
 
     recommendations: list[str] = []
+    if test_compatibility == 0:
+        recommendations.append(
+            "CAUTION: No test suite executed against this refactor. "
+            "Test compatibility is UNKNOWN (0%)."
+        )
     if api_compatibility < 80:
         recommendations.append(
             "Review API signature changes to maintain backward compatibility with callers."
@@ -226,12 +253,18 @@ def calculate_safety_score(
 
     return SafetyScoreData(
         proposal_id=proposal_record.id,
+        test_run_id=test_run_id,
+        original_checksum=original_checksum,
+        proposed_checksum=proposed_checksum,
         total=total,
+        confidence_score=confidence_score,
+        confidence_level=confidence_level,
         api_compatibility=api_compatibility,
         test_compatibility=test_compatibility,
         dependency_impact=dependency_impact,
         behavioral_risk=behavioral_risk,
         risk_level=risk_level,  # type: ignore[arg-type]
+        behavior_status=behavior_status,
         breaking_changes=breaking_changes,
         recommendations=recommendations,
     )

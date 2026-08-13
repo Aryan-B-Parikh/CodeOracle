@@ -83,6 +83,10 @@ def test_get_refactor_safety_score_endpoint_success(client: TestClient) -> None:
     data = payload["data"]
     assert "total" in data
     assert 0 <= data["total"] <= 100
+    assert "confidenceScore" in data
+    assert "confidenceLevel" in data
+    assert "behaviorStatus" in data
+    assert data["originalChecksum"] == "hash123"
     assert "apiCompatibility" in data
     assert "testCompatibility" in data
     assert "dependencyImpact" in data

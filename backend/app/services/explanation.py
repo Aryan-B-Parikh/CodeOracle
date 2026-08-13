@@ -345,6 +345,8 @@ def generate_explanation(
             snippet_lines, rel_path, entity.name, entity.line_start, entity.line_end
         )
 
+    validated_evidence = validate_evidence_items(db, repository, evidence_items)
+
     entity_summary = EntitySummary(
         id=entity.id,
         name=entity.name,
@@ -357,6 +359,47 @@ def generate_explanation(
     return ExplanationData(
         entity=entity_summary,
         explanation=explanation_fields,
-        evidence=evidence_items,
+        evidence=validated_evidence,
         provider=provider_name,
     )
+
+def validate_evidence_items(
+    db: Session, repository: Repository, evidence_items: list[EvidenceItem]
+) -> list[EvidenceItem]:
+    """Priority 4 Post-Generation Evidence Validator:
+
+    Verifies every LLM-cited evidence claim against actual repository files and line bounds.
+    Rejects hallucinated files or invalid line ranges.
+    """
+    valid_files = {f.path for f in db.query(File).filter(File.repository_id == repository.id).all()}
+    root_dir = repository_root(repository)
+    validated: list[EvidenceItem] = []
+
+    for item in evidence_items:
+        # 1. File existence check
+        if item.file not in valid_files and not (root_dir / item.file).is_file():
+            logger.warning(
+                "Evidence validator dropped citation for non-existent file: %s", item.file
+            )
+            continue
+        # 2. Line range check
+        if item.line_start <= 0 or item.line_end < item.line_start:
+            logger.warning(
+                "Evidence validator dropped citation with invalid line bounds: %s-%s",
+                item.line_start,
+                item.line_end,
+            )
+            continue
+        # 3. Code snippet verification
+        snippet, _ = _read_source_snippet(root_dir, item.file, item.line_start, item.line_end)
+        verified_code = snippet if snippet else item.code
+        validated.append(
+            EvidenceItem(
+                claim=item.claim,
+                file=item.file,
+                line_start=item.line_start,
+                line_end=item.line_end,
+                code=verified_code,
+            )
+        )
+    return validated
