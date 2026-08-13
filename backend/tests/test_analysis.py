@@ -242,11 +242,22 @@ def test_analyze_java_modern_inheritances_and_import_kind(client: TestClient) ->
         assert serializable.kind == "implements"
         assert serializable.parent_id is None
 
-        static_import = db.query(Import).filter(
-            Import.module == "java.util.Collections.emptyList"
-        ).all()
+        static_import = (
+            db.query(Import)
+            .join(File)
+            .filter(
+                File.repository_id == repository_id,
+                Import.module == "java.util.Collections.emptyList",
+            )
+            .all()
+        )
         assert static_import, "no static import persisted"
         assert all(i.kind == "static" for i in static_import)
 
-        wildcard = db.query(Import).filter(Import.module == "java.io.*").one()
+        wildcard = (
+            db.query(Import)
+            .join(File)
+            .filter(File.repository_id == repository_id, Import.module == "java.io.*")
+            .one()
+        )
         assert wildcard.kind == "normal"

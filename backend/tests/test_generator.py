@@ -78,10 +78,18 @@ def test_get_latest_test_run_endpoint(client: TestClient) -> None:
 
     data = payload["data"]
     assert "testRunId" in data
-    # The sandbox fails-closed when Docker is unavailable in test environments.
-    # Accept both passed (Docker present) and failed (Docker absent, fail-closed).
-    assert data["status"] in ("passed", "failed")
-    assert data["testsGenerated"] > 0
+    # The sandbox fails-closed when Docker is unavailable in test environments
+    # (no fake metrics, testsGenerated == 0). With Docker present the run
+    # actually executes and tests are generated.
+    from app.services.sandbox_runner import is_docker_sandbox_ready
+
+    if is_docker_sandbox_ready():
+        assert data["status"] in ("passed", "failed")
+        assert data["testsGenerated"] > 0
+    else:
+        assert data["status"] == "failed"
+        assert data["testsGenerated"] == 0
+        assert data["lineCoverage"] == 0.0
     assert data["target"] == 60.0
     assert "uncoveredLines" in data
     assert "failedTests" in data
