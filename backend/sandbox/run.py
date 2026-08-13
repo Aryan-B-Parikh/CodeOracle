@@ -1,6 +1,8 @@
-"""Runner for the CodeOracle test sandbox."""
+"""Runner for the CodeOracle test sandbox.
 
-from __future__ import annotations
+Builds a hardened `docker run`, executes staged repository tests, and returns
+canonical line/branch coverage and test statistics.
+"""
 
 import argparse
 import json
@@ -26,3 +28,257 @@ PYTHON_CMD = (
     "pytest -s /sandbox/tests -p no:cacheprovider --cov /sandbox/src --cov-branch "
     "--cov-report=json:/home/codeoracle/coverage.json --cov-report=term "
     "--junitxml=/home/codeoracle/junit.xml; RC=$?; "
+    "cat /home/codeoracle/coverage.json 2>/dev/null; "
+    "cat /home/codeoracle/junit.xml 2>/dev/null; "
+    "exit $RC"
+)
+JAVA_CMD = (
+    "cp -r /sandbox /home/codeoracle/project && "
+    "cd /home/codeoracle/project && "
+    "mvn -o -q test jacoco:report; RC=$?; "
+    "(python3 /opt/parse_jacoco.py /home/codeoracle/project/target/site/jacoco/jacoco.xml "
+    "2>/dev/null || echo '{\"lineCoverage\": 0.0, \"branchCoverage\": 0.0, \"uncoveredLines\": []}'); "
+    "cat /home/codeoracle/project/target/surefire-reports/*.xml 2>/dev/null; "
+    "exit $RC"
+)
+
+
+class _BoundedReader(threading.Thread):
+    """Read a pipe while bounding retained output."""
+
+    def __init__(self, stream, limit: int, on_exceed=None):
+        super().__init__(daemon=True)
+        self._stream = stream
+        self._limit = limit
+        self._on_exceed = on_exceed
+        self.data = ""
+        self.exceeded = False
+
+    def run(self) -> None:
+        while True:
+            chunk = self._stream.read(_CHUNK)
+            if not chunk:
+                return
+            if self.exceeded:
+                continue
+            remaining = self._limit - len(self.data)
+            if remaining <= 0:
+                self._exceed()
+                continue
+            self.data += chunk[:remaining]
+            if len(chunk) > remaining:
+                self._exceed()
+
+    def _exceed(self) -> None:
+        self.exceeded = True
+        if self._on_exceed is not None:
+            self._on_exceed()
+
+
+def build_command(staging_dir: Path, language: str, name: str, image: str) -> list[str]:
+    command = ["sh", "-c", PYTHON_CMD if language == "python" else JAVA_CMD]
+    mounts = (
+        [
+            "-v",
+            f"{staging_dir / 'src'}:/sandbox/src:ro",
+            "-v",
+            f"{staging_dir / 'tests'}:/sandbox/tests:ro",
+        ]
+        if language == "python"
+        else ["-v", f"{staging_dir}:/sandbox:ro"]
+    )
+    return [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        name,
+        "--network",
+        "none",
+        "--cpus",
+        str(policy.MAX_CPU),
+        "--memory",
+        policy.MAX_MEMORY,
+        "--memory-swap",
+        policy.MAX_MEMORY,
+        "--pids-limit",
+        str(policy.MAX_PIDS),
+        "--read-only",
+        "--tmpfs",
+        policy.MAX_TMPFS,
+        "--cap-drop",
+        "ALL",
+        "--security-opt",
+        "no-new-privileges",
+        "--user",
+        "codeoracle",
+        "--workdir",
+        "/sandbox",
+        *mounts,
+        "-v",
+        "/home/codeoracle",
+        image,
+        *command,
+    ]
+
+
+def _kill_container(name: str) -> None:
+    subprocess.run(["docker", "kill", name], capture_output=True, text=True)
+
+
+def _normalize_python_coverage(data: dict) -> dict:
+    totals = data.get("totals", {})
+    uncovered: list[dict] = []
+    for name, file_data in data.get("files", {}).items():
+        if not name:
+            continue
+        rel = name.replace("/sandbox/src/", "")
+        for line in file_data.get("missing_lines", []):
+            uncovered.append({"file": rel, "line": line})
+    return {
+        "lineCoverage": round(float(totals.get("percent_covered", 0.0)), 2),
+        "branchCoverage": round(float(totals.get("percent_branches_covered", 0.0)), 2),
+        "uncoveredLines": uncovered,
+    }
+
+
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def parse_tests_report(stdout: str) -> dict | None:
+    """Parse pytest or Surefire XML embedded in stdout into real test stats."""
+    import xml.etree.ElementTree as ET
+
+    bare = re.sub(r"<\?xml[^>]*\?>", "", stdout)
+    if not bare.strip():
+        return None
+    try:
+        root = ET.fromstring(f"<root>{bare}</root>")
+    except ET.ParseError:
+        return None
+
+    cases: list[dict] = []
+    total = 0
+    for suite in root.iter("testsuite"):
+        try:
+            total += int(suite.attrib.get("tests", 0))
+        except ValueError:
+            continue
+        for case in suite.findall("testcase"):
+            name = str(case.attrib.get("name", "unknown"))
+            try:
+                duration_ms = int(round(float(case.attrib.get("time", 0.0)) * 1000))
+            except ValueError:
+                duration_ms = 0
+            failed = case.find("failure") is not None or case.find("error") is not None
+            cases.append({"name": name, "durationMs": duration_ms, "status": "failed" if failed else "passed"})
+
+    if not cases and total == 0:
+        return None
+    failed = sum(1 for c in cases if c["status"] == "failed")
+    return {
+        "generated": total if total > 0 else len(cases),
+        "passed": len(cases) - failed,
+        "failed": failed,
+        "cases": cases,
+    }
+
+
+def extract_coverage(stdout: str) -> dict | None:
+    for line in reversed(stdout.splitlines()):
+        cleaned = _ANSI.sub("", line).strip()
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+        if start == -1 or end <= start:
+            continue
+        try:
+            data = json.loads(cleaned[start : end + 1])
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(data, dict):
+            continue
+        if "lineCoverage" in data:
+            return data
+        if isinstance(data.get("totals"), dict):
+            return _normalize_python_coverage(data)
+    return None
+
+
+def run(staging_dir: Path, language: str, timeout: int, image: str) -> dict:
+    name = f"codeoracle-sandbox-{uuid.uuid4().hex[:8]}"
+    command = build_command(staging_dir, language, name, image)
+    started = time.monotonic()
+
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    out_reader = _BoundedReader(proc.stdout, policy.MAX_STDOUT_BYTES, on_exceed=lambda: _kill_container(name))
+    err_reader = _BoundedReader(proc.stderr, policy.MAX_STDERR_BYTES, on_exceed=lambda: _kill_container(name))
+    out_reader.start()
+    err_reader.start()
+
+    timed_out = False
+    reason = "completed"
+    try:
+        exit_code = proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        _kill_container(name)
+        proc.kill()
+        exit_code = policy.EXIT_TIMEOUT
+        timed_out = True
+        reason = "timeout"
+    out_reader.join(timeout=5)
+    err_reader.join(timeout=5)
+
+    if not timed_out and (out_reader.exceeded or err_reader.exceeded):
+        exit_code = policy.EXIT_RESOURCE_LIMIT
+        reason = "stdout limit exceeded" if out_reader.exceeded else "stderr limit exceeded"
+
+    stdout = out_reader.data
+    stderr = err_reader.data
+    coverage = extract_coverage(stdout)
+    tests = parse_tests_report(stdout)
+    log = (stdout + "\n--- stderr ---\n" + stderr)[-LOG_LIMIT:]
+    return {
+        "exitCode": exit_code,
+        "language": language,
+        "timedOut": timed_out,
+        "reason": reason,
+        "durationSeconds": round(time.monotonic() - started, 1),
+        "coverage": coverage,
+        "tests": tests,
+        "log": log,
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Run tests in the CodeOracle sandbox.")
+    parser.add_argument("--language", choices=["python", "java"], required=True)
+    parser.add_argument("--source", type=Path, required=True)
+    parser.add_argument("--tests", type=Path, default=None)
+    parser.add_argument("--image", default=IMAGE)
+    parser.add_argument("--timeout", type=int, default=policy.DEFAULT_TIMEOUT)
+    args = parser.parse_args(argv)
+
+    with tempfile.TemporaryDirectory(prefix="codeoracle-stage-") as tmp:
+        staging_dir = Path(tmp)
+        tests_dir = args.tests.resolve() if args.tests else None
+        try:
+            stage.stage(args.source.resolve(), args.language, tests_dir, staging_dir)
+        except StageLimitError as exc:
+            result = {
+                "exitCode": policy.EXIT_RESOURCE_LIMIT,
+                "language": args.language,
+                "timedOut": False,
+                "reason": str(exc),
+                "coverage": None,
+                "log": "",
+            }
+            print(json.dumps(result, indent=2))
+            return 1
+        result = run(staging_dir, args.language, args.timeout, args.image)
+
+    print(json.dumps(result, indent=2))
+    return 0 if result["exitCode"] == 0 else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
