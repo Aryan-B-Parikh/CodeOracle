@@ -8,6 +8,7 @@ import logging
 import re
 import uuid
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -34,11 +35,7 @@ def _read_entity_source(repository: Repository, entity: Entity) -> str:
 
     candidate = root / entity.file.path
     if not candidate.exists():
-        # Try stripping leading path segments
-        for rel in (
-            Path(entity.file.path).name,
-            entity.file.path.lstrip("/\\"),
-        ):
+        for rel in (Path(entity.file.path).name, entity.file.path.lstrip("/\\")):
             alt = root / rel
             if alt.exists():
                 candidate = alt
@@ -60,19 +57,18 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
 
-def _parse_llm_json(text: str) -> dict:
-    """Extract JSON object from LLM response, stripping markdown fences."""
-    # Strip markdown code fences
+def _parse_llm_json(text: str) -> dict[str, Any]:
+    """Extract a JSON object from an LLM response, safely type-checking the result."""
     cleaned = re.sub(r"```(?:json)?\s*", "", text)
     cleaned = cleaned.replace("```", "").strip()
-    # Find first { ... }
     match = re.search(r"\{.*\}", cleaned, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group())
-        except json.JSONDecodeError:
-            pass
-    return {}
+    if not match:
+        return {}
+    try:
+        parsed = json.loads(match.group())
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
 
 
 def propose_refactor(
@@ -80,34 +76,23 @@ def propose_refactor(
     repository: Repository,
     entity_id: uuid.UUID,
 ) -> RefactorProposal:
-    """Generate a refactor proposal for a single entity using AST facts + LLM.
-
-    The original repository files are never modified.  The proposal_id, original
-    source checksum, and both code versions are returned as a schema object.
-    """
+    """Generate a refactor proposal for a single entity using AST facts + LLM."""
     entity = db.get(Entity, entity_id)
     if entity is None or entity.repository_id != repository.id:
         raise ValueError(f"entity {entity_id} not found in repository {repository.id}")
 
-    # --- Gather evidence ---
     original_source = _read_entity_source(repository, entity)
 
-    # Callers: function/method names that call this entity
     callers: list[str] = []
-    call_rows = (
-        db.query(Call)
-        .filter(Call.callee_id == entity_id)
-        .limit(20)
-        .all()
-    )
+    call_rows = db.query(Call).filter(Call.callee_id == entity_id).limit(20).all()
     for call in call_rows:
         if call.caller_id is None:
             continue
         caller_entity = db.get(Entity, call.caller_id)
         if caller_entity and caller_entity.file:
             callers.append(
-                f"{caller_entity.name} ({caller_entity.file.path}"
-                f":{caller_entity.line_start})"
+                f"{caller_entity.name} ({caller_entity.file.path}:"
+                f"{caller_entity.line_start})"
             )
 
     static_facts = (
@@ -125,14 +110,12 @@ def propose_refactor(
     )
     system_prompt = secure_system_prompt(REFACTOR_SYSTEM)
 
-    # --- LLM call ---
     rationale: list[str] = []
-    proposed_code: str = original_source
+    proposed_code = original_source
     behavioral_diffs: list[str] = []
 
     try:
-        llm = get_llm_gateway()
-        resp = llm.complete(prompt=user_prompt, system=system_prompt)
+        resp = get_llm_gateway().complete(prompt=user_prompt, system=system_prompt)
         parsed = _parse_llm_json(resp.content)
         if parsed:
             rationale = [str(r) for r in parsed.get("rationale", [])]
@@ -141,7 +124,6 @@ def propose_refactor(
                 str(d) for d in parsed.get("behavioral_differences", [])
             ]
         else:
-            # Fallback: use the raw content as the proposed code if it looks like code
             content = resp.content.strip()
             if content:
                 rationale = ["LLM response was not valid JSON; raw proposal included."]
@@ -150,20 +132,14 @@ def propose_refactor(
         logger.warning("LLM refactor call failed for %s: %s", entity.name, exc)
         rationale = [
             "LLM unavailable — structural refactor suggested based on static analysis.",
-            f"Entity has CCN complexity={entity.complexity}; "
-            "consider extracting sub-functions.",
+            f"Entity has CCN complexity={entity.complexity}; consider extracting sub-functions.",
         ]
-        # Provide a minimal syntactic proposal (add docstring if missing)
-        if original_source and "\"\"\"" not in original_source:
+        if original_source and '"""' not in original_source:
             lines = original_source.splitlines()
             if lines:
                 indent = "    " if lines[0].startswith("    ") else ""
-                docstring_line = (
-                    f'{indent}    """TODO: document {entity.name}."""'
-                )
-                proposed_code = "\n".join(
-                    [lines[0], docstring_line] + lines[1:]
-                )
+                docstring_line = f'{indent}    """TODO: document {entity.name}."""'
+                proposed_code = "\n".join([lines[0], docstring_line] + lines[1:])
 
     return RefactorProposal(
         proposal_id=uuid.uuid4(),
