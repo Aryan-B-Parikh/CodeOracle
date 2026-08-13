@@ -95,7 +95,11 @@ def test_calls_resolved_locally() -> None:
     assert calls["tax.calculate_tax"] is False
     assert calls["database.fetch_all"] is False
     assert calls["database.insert"] is False
-    assert any(c.line == 43 for c in _entity(parsed, "calculate_invoice").calls if c.name == "calculate_subtotal")
+    assert any(
+        c.line == 43
+        for c in _entity(parsed, "calculate_invoice").calls
+        if c.name == "calculate_subtotal"
+    )
 
 
 def test_module_imports() -> None:

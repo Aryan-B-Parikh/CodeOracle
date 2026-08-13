@@ -2,6 +2,7 @@
 line-length = 100
 target-version = "py311"
 src = ["app"]
+exclude = ["tests/fixtures"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
@@ -18,7 +19,7 @@ warn_return_any = true
 exclude = ["tests"]
 
 [[tool.mypy.overrides]]
-module = ["radon", "radon.*", "networkx", "celery", "celery.*"]
+module = ["radon", "radon.*", "networkx", "celery", "celery.*", "tiktoken", "tiktoken.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
@@ -28,4 +29,9 @@ addopts = "-q"
 norecursedirs = ["fixtures", "venv", ".venv"]
 markers = [
     "network: tests that require network access (auto-skip when unreachable)",
+    "scalability: benchmark tests that exercise the full analysis pipeline at scale",
+]
+filterwarnings = [
+    "ignore::pytest.PytestCollectionWarning",
+    "ignore::starlette.exceptions.StarletteDeprecationWarning",
 ]

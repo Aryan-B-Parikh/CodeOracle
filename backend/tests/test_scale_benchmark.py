@@ -16,12 +16,12 @@ import uuid
 import zipfile
 
 import pytest
-from fastapi.testclient import TestClient
 from app.db.models.entity import Entity
 from app.db.models.file import File
 from app.db.models.repository import Repository
 from app.db.session import SessionLocal
 from app.services.analysis import analyze_repository
+from fastapi.testclient import TestClient
 
 
 def _generate_10k_loc_zip() -> bytes:

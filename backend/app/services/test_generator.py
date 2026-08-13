@@ -80,17 +80,82 @@ def _typed_arg_for_param(param: str) -> str:
     _LIST_KEYS = ("list", "sequence", "items", "expenses", "rows", "values")
     if any(key in source for key in _LIST_KEYS):
         return "[]"
-    _DICT_KEYS = ("dict", "mapping", "config", "expense", "payload", "data", "options")
+    _DICT_KEYS = ("dict", "mapping", "config", "expense", "payload", "data", "options", "record")
     if any(key in source for key in _DICT_KEYS):
         return "{}"
-    _STR_KEYS = ("str", "string", "name", "key", "category", "label", "text", "path", "message")
+    _STR_KEYS = (
+        "str",
+        "string",
+        "name",
+        "key",
+        "category",
+        "label",
+        "text",
+        "path",
+        "message",
+        "region",
+        "uri",
+        "username",
+        "password",
+        "query",
+        "token",
+        "s",
+    )
     if any(key in source for key in _STR_KEYS):
         return '"test"'
+    if len(name) == 1 and name.isalpha():
+        return "1.0"
     return "None"
 
 
-def _build_python_test_fallback(entities: list[Entity]) -> str:
-    """Generate syntactically valid pytest tests using annotation-grounded arguments."""
+def _functions_with_raise(root_dir: Path, entities: list[Entity]) -> set[str]:
+    """AST evidence: names of functions whose body contains a ``raise`` statement.
+
+    Only functions with raise evidence get an ``exception_path`` test, so the
+    generated suite never asserts an exception the code cannot produce.
+    """
+    raise_names: set[str] = set()
+    sources: dict[uuid.UUID, str] = {}
+    for entity in entities:
+        if not entity.file or "test" in entity.file.path.lower():
+            continue
+        full_path = root_dir / entity.file.path
+        if not full_path.is_file():
+            continue
+        if entity.file.id not in sources:
+            try:
+                sources[entity.file.id] = full_path.read_text(
+                    encoding="utf-8", errors="replace"
+                )
+            except OSError:
+                continue
+        try:
+            tree = ast.parse(sources[entity.file.id])
+        except SyntaxError:
+            continue
+        node = next(
+            (
+                n
+                for n in ast.walk(tree)
+                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and n.name == entity.name
+            ),
+            None,
+        )
+        if node is not None and any(isinstance(n, ast.Raise) for n in ast.walk(node)):
+            raise_names.add(entity.name)
+    return raise_names
+
+
+def _build_python_test_fallback(
+    entities: list[Entity], *, raise_names: set[str] | None = None
+) -> str:
+    """Generate syntactically valid pytest tests using annotation-grounded arguments.
+
+    Exception-path tests are emitted only for functions with AST raise evidence;
+    class methods are tested through their declaring class instead of being
+    treated as module-level functions.
+    """
     lines: list[str] = ["import pytest", ""]
     module_stems = sorted(
         {
@@ -108,6 +173,20 @@ def _build_python_test_fallback(entities: list[Entity]) -> str:
             continue
         stem = Path(entity.file.path).stem
         func_name = entity.name
+        is_method = entity.type == "method"
+        parent = entity.parent if is_method else None
+        class_name = parent.name if parent is not None else ""
+
+        if is_method:
+            lines.append(f"def test_{func_name}_main_branch():")
+            lines.append(
+                f'    """Test main branch execution of {func_name}."""'
+            )
+            lines.append(f"    assert hasattr({stem}, '{class_name}')")
+            lines.append(f"    cls = getattr({stem}, '{class_name}')")
+            lines.append(f"    assert callable(getattr(cls, '{func_name}', None))")
+            lines.append("")
+            continue
 
         lines.append(f"def test_{func_name}_main_branch():")
         lines.append(f'    """Test main branch execution of {func_name}."""')
@@ -116,23 +195,28 @@ def _build_python_test_fallback(entities: list[Entity]) -> str:
         lines.append("    assert callable(func)")
         lines.append("")
 
-        sig = entity.signature or ""
-        params_str = sig[sig.find("(") + 1 : sig.rfind(")")] if "(" in sig and ")" in sig else ""
-        param_list = [
-            p.strip()
-            for p in params_str.split(",")
-            if p.strip() and p.strip() not in ("self", "cls")
-        ]
-        args_str = ", ".join(_typed_arg_for_param(p) for p in param_list)
+        if raise_names is None or func_name in raise_names:
+            sig = entity.signature or ""
+            params_str = (
+                sig[sig.find("(") + 1 : sig.rfind(")")]
+                if "(" in sig and ")" in sig
+                else ""
+            )
+            param_list = [
+                p.strip()
+                for p in params_str.split(",")
+                if p.strip() and p.strip() not in ("self", "cls")
+            ]
+            args_str = ", ".join(_typed_arg_for_param(p) for p in param_list)
 
-        lines.append(f"def test_{func_name}_exception_path():")
-        lines.append(
-            f'    """Test exception handling / boundary condition of {func_name}."""'
-        )
-        lines.append("    with pytest.raises((ValueError, TypeError, KeyError, Exception)):")
-        lines.append(f"        func = getattr({stem}, '{func_name}')")
-        lines.append(f"        func({args_str})")
-        lines.append("")
+            lines.append(f"def test_{func_name}_exception_path():")
+            lines.append(
+                f'    """Test exception handling / boundary condition of {func_name}."""'
+            )
+            lines.append("    with pytest.raises((ValueError, TypeError, KeyError, Exception)):")
+            lines.append(f"        func = getattr({stem}, '{func_name}')")
+            lines.append(f"        func({args_str})")
+            lines.append("")
 
     return "\n".join(lines)
 
@@ -233,8 +317,10 @@ def generate_unit_tests(
         root_dir = repository_root(repository)
     except Exception:
         from app.config import get_settings
+
         root_dir = get_settings().upload_dir / str(repository.id)
         root_dir.mkdir(parents=True, exist_ok=True)
+    raise_names = _functions_with_raise(root_dir, target_entities)
     snippets: list[str] = []
     for e in target_entities[:5]:
         if e.file:
@@ -283,7 +369,7 @@ def generate_unit_tests(
         generated_code = (
             _build_java_test_fallback(target_entities)
             if main_lang in ("java", "junit")
-            else _build_python_test_fallback(target_entities)
+            else _build_python_test_fallback(target_entities, raise_names=raise_names)
         )
 
     from app.services.sandbox_runner import execute_sandbox_test_run
@@ -297,6 +383,40 @@ def generate_unit_tests(
         target_functions=target_func_names,
         test_run_id=test_run.id,
     )
+
+
+def _signature_arg_sets(entity: Entity) -> list[str]:
+    """Candidate argument sets for a function, grounded in its signature.
+
+    Each set is wrapped in try/except by the caller, so a mismatch between a
+    probe and the function's real contract cannot fail the test run — it only
+    declines to execute that probe.
+    """
+    sig = entity.signature or ""
+    params_str = (
+        sig[sig.find("(") + 1 : sig.rfind(")")]
+        if "(" in sig and ")" in sig
+        else ""
+    )
+    param_list = [
+        p.strip()
+        for p in params_str.split(",")
+        if p.strip() and p.strip() not in ("self", "cls")
+    ]
+    if not param_list:
+        return ["()"]
+
+    def _tuple(elements: list[str]) -> str:
+        inner = ", ".join(elements)
+        if len(elements) == 1:
+            inner += ","
+        return f"({inner})"
+
+    typed = _tuple([_typed_arg_for_param(p) for p in param_list])
+    sets = [typed]
+    for probe in ("0.0", "1000.0", "5000.0", "None", "'admin'"):
+        sets.append(_tuple([probe for _ in param_list]))
+    return sets
 
 
 def _build_python_repair_fallback(entities: list[Entity]) -> str:
@@ -320,8 +440,11 @@ def _build_python_repair_fallback(entities: list[Entity]) -> str:
     for entity in entities:
         if not entity.file or "test" in entity.file.path.lower():
             continue
+        if entity.type == "method" and entity.parent is not None:
+            continue
         stem = Path(entity.file.path).stem
         func_name = entity.name
+        arg_sets = _signature_arg_sets(entity)
         lines.extend(
             [
                 f"def test_{func_name}_repair_branch():",
@@ -329,14 +452,12 @@ def _build_python_repair_fallback(entities: list[Entity]) -> str:
                 f"    func = getattr(mod, '{func_name}', None) if mod else None",
                 "    if callable(func):",
                 "        sample_args = [",
-                "            (),",
-                "            (100.0, 1000.0),",
-                "            (850.0, 1000.0),",
-                "            (1200.0, 1000.0),",
-                "            ('admin', 's3cret'),",
-                "            ('guest', 'guest'),",
-                "            ([], 100.0),",
-                "            ([{'category': 'food', 'amount': 10.0}], 100.0),",
+            ]
+        )
+        for arg_set in arg_sets:
+            lines.append(f"            ({arg_set}),")
+        lines.extend(
+            [
                 "        ]",
                 "        for args in sample_args:",
                 "            try:",

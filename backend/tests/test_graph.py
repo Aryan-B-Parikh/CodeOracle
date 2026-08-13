@@ -134,7 +134,11 @@ def test_graph_layout_for_java_classes_and_methods(client: TestClient) -> None:
         n for n in nodes.values() if n.get("qualifiedName") == "TaxCalculator"
     )
     contains = _edges_by_kind(payload, "contains")
-    assert (tax_calculator["id"], f"{tax_calculator['id'].split('::')[0]}::TaxCalculator.rateFor") in contains
+    expected_edge = (
+        tax_calculator["id"],
+        f"{tax_calculator['id'].split('::')[0]}::TaxCalculator.rateFor",
+    )
+    assert expected_edge in contains
 
     calls = _edges_by_kind(payload, "call")
     tax_file = tax_calculator["id"].split("::")[0]

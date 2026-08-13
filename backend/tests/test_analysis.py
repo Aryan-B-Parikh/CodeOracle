@@ -51,7 +51,10 @@ def test_analyze_python_basic_persists_graph(client: TestClient) -> None:
         assert repository.entity_count == 23
 
         calls = db.query(Call).filter(Call.repository_id == repository_id).all()
-        resolved = next(c for c in calls if c.callee_name == "apply_discount" and c.caller is not None)
+        resolved = next(
+            c for c in calls
+            if c.callee_name == "apply_discount" and c.caller is not None
+        )
         assert resolved.callee_id is not None
         assert resolved.external is False
         external = next(c for c in calls if c.callee_name == "customer.load_customer")

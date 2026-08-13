@@ -7,6 +7,10 @@ os.environ.setdefault("DATABASE_URL", "sqlite://")
 _TEST_UPLOAD_DIR = tempfile.mkdtemp(prefix="codeoracle-tests-")
 os.environ.setdefault("UPLOAD_DIR", _TEST_UPLOAD_DIR)
 os.environ.setdefault("CELERY_TASK_ALWAYS_EAGER", "1")
+# Tests must be hermetic: the LLM gateway falls back to deterministic AST-fact
+# generators, so the pipeline never depends on a live model or a local .env key.
+os.environ.setdefault("LLM_PROVIDER", "mock")
+os.environ["LLM_API_KEY"] = ""
 
 import app.db.models  # noqa: E402, F401
 import pytest  # noqa: E402

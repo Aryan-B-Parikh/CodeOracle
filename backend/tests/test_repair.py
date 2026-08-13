@@ -1,12 +1,9 @@
 """Unit and integration tests for the coverage repair loop (T-15)."""
 
 import io
-import os
 import uuid
 import zipfile
 from pathlib import Path
-
-import pytest
 
 from app.db.models.repository import Repository
 from app.db.session import SessionLocal
@@ -84,16 +81,19 @@ def test_coverage_repair_loop_service() -> None:
         assert isinstance(final_run.target_reached, bool)
 
 
-@pytest.mark.skipif(
-    not os.environ.get("LLM_API_KEY"),
-    reason="Golden-chain test requires a live LLM (LLM_API_KEY not set)",
-)
 def test_unbroken_golden_chain_coverage_repair(client: TestClient) -> None:
     """Requirement 2: Unbroken Golden-Chain System Test.
 
     Uploads legacy demo repository, calls generate_unit_tests() for baseline,
-    then executes generate_uncovered_tests() to repair uncovered lines using LLM.
-    Strictly asserts final line coverage >= 60.0%.
+    then executes generate_uncovered_tests() to repair uncovered lines.
+
+    The chain runs against the mock LLM provider (enforced in conftest), so
+    the AST-fact fallback generators carry the whole pipeline — the golden
+    chain must hold without any LLM.
+
+    When Docker is available: strictly asserts the chain ran end-to-end and
+    reached the 60% line-coverage acceptance floor.
+    When Docker is unavailable: asserts fail-closed behavior (status == "failed").
     """
     repo_id_str = _upload_and_analyze(client, "python_legacy")
     with SessionLocal() as db:
@@ -102,6 +102,7 @@ def test_unbroken_golden_chain_coverage_repair(client: TestClient) -> None:
 
         # 1. Baseline initial unit test generation
         from app.services.test_generator import generate_unit_tests
+
         baseline_test_case = generate_unit_tests(db, repo)
         assert baseline_test_case is not None
 
@@ -111,15 +112,25 @@ def test_unbroken_golden_chain_coverage_repair(client: TestClient) -> None:
         )
         assert final_run.id is not None
         assert final_run.iteration <= 3
-        # Assert unbroken golden-chain requirement
+
+        # 3. Assert unbroken golden-chain requirement
         from app.services.sandbox_runner import is_docker_sandbox_ready
 
         if is_docker_sandbox_ready():
-            assert final_run.status == "passed"
+            assert final_run.tests_generated > 0, (
+                "Golden-chain: no tests were generated — repair loop did not run"
+            )
+            assert final_run.status == "passed", (
+                f"Golden-chain: generated tests did not pass "
+                f"({final_run.tests_passed}/{final_run.tests_generated} passed, "
+                f"{final_run.tests_failed} failed)"
+            )
+            assert final_run.line_coverage >= 60.0, (
+                f"Golden-chain: line coverage {final_run.line_coverage}% < 60.0%"
+            )
             assert final_run.target_reached is True
-            assert final_run.line_coverage >= 60.0
-            assert final_run.tests_generated > 0
         else:
+            # Fail-closed contract: sandbox unavailable → status failed, no fake metrics
             assert final_run.status == "failed"
 
 
