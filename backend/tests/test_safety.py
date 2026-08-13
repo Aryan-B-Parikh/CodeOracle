@@ -1,16 +1,15 @@
-"""Unit and integration tests for Breaking-Change detection and Refactor Safety Score (T-18 & T-19)."""
+"""Unit and integration tests for Breaking-Change and Refactor Safety Score (T-18 & T-19)."""
 
 import io
 import uuid
 import zipfile
 from pathlib import Path
 
-from fastapi.testclient import TestClient
-
 from app.db.models.entity import Entity
 from app.db.models.repository import Repository
 from app.db.session import SessionLocal
 from app.services.analysis import analyze_repository
+from fastapi.testclient import TestClient
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
@@ -62,7 +61,10 @@ def test_get_refactor_safety_score_endpoint_success(client: TestClient) -> None:
             entity_name="calculate_tax",
             file_path="tax.py",
             original="def calculate_tax(rate, amount):\n    return rate * amount",
-            proposed="def calculate_tax(rate: float, amount: float) -> float:\n    return rate * amount",
+            proposed=(
+                "def calculate_tax(rate: float, amount: float) -> float:\n"
+                "    return rate * amount"
+            ),
             original_checksum="hash123",
             rationale=["Add type annotations"],
             behavioral_differences=[],

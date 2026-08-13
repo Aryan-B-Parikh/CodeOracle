@@ -212,6 +212,7 @@ def test_propose_refactor_original_unchanged(
 
 def test_detect_breaking_changes_unit() -> None:
     import uuid
+
     from app.db.models.entity import Entity
     from app.db.models.repository import Repository
     from app.db.session import SessionLocal
