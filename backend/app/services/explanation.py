@@ -106,6 +106,13 @@ def _extract_evidence_from_snippet(
     return evidence
 
 
+def explain_entity(
+    db: Session, repository: Repository, entity: Entity
+) -> ExplanationData:
+    """Generate evidence-cited explanation for a given entity model."""
+    return generate_explanation(db, repository.id, entity.id)
+
+
 def generate_explanation(
     db: Session,
     repository_id: uuid.UUID,

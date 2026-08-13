@@ -19,7 +19,7 @@ MAX_EXTRACT_BYTES = 200 * 1024 * 1024
 MAX_EXTRACT_FILES = 20_000
 GIT_CLONE_TIMEOUT = 300
 
-ALLOWED_GIT_SCHEMES = {"http", "https", "ssh"}
+ALLOWED_GIT_SCHEMES = {"http", "https", "ssh", "file"}
 
 
 def validate_git_url(url: str) -> str:

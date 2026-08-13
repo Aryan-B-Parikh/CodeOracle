@@ -15,44 +15,45 @@ import time
 import uuid
 import zipfile
 
+import pytest
+from fastapi.testclient import TestClient
 from app.db.models.entity import Entity
 from app.db.models.file import File
 from app.db.models.repository import Repository
 from app.db.session import SessionLocal
 from app.services.analysis import analyze_repository
-from fastapi.testclient import TestClient
 
 
 def _generate_10k_loc_zip() -> bytes:
-    """Generate an in-memory zip archive containing ~10,000 LOC across 50 Python modules."""
+    """Dynamically generate synthetic zip archive containing 10,000-10,500 scanner LOC."""
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
-        for m in range(1, 51):
+        # 63 modules * ~162 lines per module = 10,206 LOC
+        for m in range(1, 64):
             lines: list[str] = [
-                f'"""Module {m} business logic processing layer for enterprise scaling."""',
+                f'"""Module {m} enterprise transaction processor."""',
                 "import os",
                 "import sys",
                 "import math",
                 "",
-                f"class BusinessProcessor{m}:",
-                f'    """Processor class for domain model {m}."""',
+                f"class Processor{m}:",
+                f'    """Enterprise scaling domain model {m}."""',
                 "",
                 "    def __init__(self, config_id: int) -> None:",
                 "        self.config_id = config_id",
                 "        self.processed_count = 0",
                 "",
             ]
-            for f in range(1, 11):
+            for f in range(1, 10):
                 lines.extend([
-                    f"    def execute_subtask_{f}(self, val: float, mult: int = 1) -> float:",
-                    f'        """Execute subtask {f} with validation and audit logging."""',
+                    f"    def compute_subtask_{f}(self, val: float, mult: int = 1) -> float:",
+                    f'        """Execute subtask {f} with audit logging."""',
                     "        if val < 0.0:",
                     '            raise ValueError("val cannot be negative")',
                     "        val_a = math.sqrt(abs(val)) * mult + self.config_id",
                     "        val_b = math.pow(val_a, 1.05) - (mult * 0.5)",
                     "        val_c = math.log1p(abs(val_b)) + self.processed_count",
                     "        result = val_a + val_b + val_c",
-                    "        # Enterprise audit block padding for line count",
                     f'        audit_msg = f"Task {f} in module {m} processed value {{result}}"',
                     "        if len(audit_msg) > 100:",
                     "            audit_msg = audit_msg[:100]",
@@ -60,42 +61,61 @@ def _generate_10k_loc_zip() -> bytes:
                     "        return result",
                     "",
                 ])
-            # Add ~170 lines per module (50 modules * 170 LOC = 8,500 LOC)
             archive.writestr(f"pkg/module_{m}.py", "\n".join(lines))
     return buffer.getvalue()
 
 
+@pytest.mark.scalability
 def test_10k_loc_scalability_benchmark(client: TestClient) -> None:
-    """Benchmark full analysis pipeline on a 10,000 LOC codebase."""
+    """Benchmark full analysis pipeline on exactly 10,000-10,500 scanner LOC codebase."""
+    import resource
+
+    t0 = time.time()
     zip_bytes = _generate_10k_loc_zip()
 
+    t_upload_start = time.time()
     upload_resp = client.post(
         "/api/v1/repositories/upload",
         files={"file": ("scale_10k_demo.zip", zip_bytes, "application/zip")},
     )
     assert upload_resp.status_code == 201
+    upload_ms = round((time.time() - t_upload_start) * 1000, 2)
     repo_id = uuid.UUID(upload_resp.json()["data"]["id"])
 
-    start_time = time.time()
+    t_pipeline_start = time.time()
 
     with SessionLocal() as db:
         repository = db.get(Repository, repo_id)
         assert repository is not None
+
+        # Execute full analysis pipeline (Scan -> AST Facts -> Graph -> Index -> Summary)
         analyze_repository(db, repository)
+        tot_loc = repository.loc
 
         file_count = db.query(File).filter(File.repository_id == repo_id).count()
         entity_count = db.query(Entity).filter(Entity.repository_id == repo_id).count()
-        tot_loc = repository.loc
 
-    elapsed_seconds = round(time.time() - start_time, 2)
+        from app.db.models.call import Call
+        from app.db.models.chunk import Chunk
 
-    # Verifications
-    assert tot_loc >= 8000, f"Expected >8,000 LOC, measured {tot_loc}"
-    assert file_count >= 25, f"Expected >=25 files, measured {file_count}"
-    assert entity_count >= 200, f"Expected >=200 entities, measured {entity_count}"
-    assert elapsed_seconds < 300.0, f"Exceeded 5 min budget: {elapsed_seconds}s"
+        call_edges_count = db.query(Call).filter(Call.repository_id == repo_id).count()
+        vector_count = db.query(Chunk).filter(Chunk.repository_id == repo_id).count()
+
+    wall_time_ms = round((time.time() - t0) * 1000, 2)
+
+    try:
+        peak_memory_mb = round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 2)
+    except Exception:
+        peak_memory_mb = 0.0
+
+    # Strict Requirement 3 Assertions
+    assert 10_000 <= tot_loc <= 10_500, f"Expected 10,000-10,500 LOC, measured {tot_loc}"
+    assert file_count >= 60, f"Expected >=60 files, measured {file_count}"
+    assert entity_count >= 500, f"Expected >=500 entities, measured {entity_count}"
+    assert wall_time_ms < 300_000.0, f"Exceeded 5 min budget: {wall_time_ms}ms"
 
     print(
-        f"\n[10K LOC BENCHMARK RESULT] LOC={tot_loc:,} | Files={file_count} | "
-        f"Entities={entity_count} | WallTime={elapsed_seconds}s (Target: <300s)"
+        f"\n[10K LOC BENCHMARK TELEMETRY] LOC={tot_loc:,} | Files={file_count} | "
+        f"Entities={entity_count} | GraphEdges={call_edges_count} | Vectors={vector_count} | "
+        f"UploadMs={upload_ms}ms | WallTimeMs={wall_time_ms}ms | PeakMemMB={peak_memory_mb}MB"
     )

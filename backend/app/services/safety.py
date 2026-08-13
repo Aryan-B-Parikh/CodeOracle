@@ -171,21 +171,25 @@ def calculate_safety_score(
     )
     proposed_checksum = hashlib.sha256(proposed_code.encode()).hexdigest()
 
-    latest_run = (
+    # Proposal-bound safety evidence: find TestRun explicitly created for this proposal_id
+    matching_run = (
         db.query(TestRun)
-        .filter(TestRun.repository_id == repository.id)
+        .filter(
+            TestRun.repository_id == repository.id,
+            TestRun.tested_proposal_id == proposal_record.id,
+        )
         .order_by(TestRun.created_at.desc())
         .first()
     )
     test_run_id: uuid.UUID | None = None
-    if latest_run is not None:
-        test_run_id = latest_run.id
-        if latest_run.status == "passed" and latest_run.target_reached:
+    if matching_run is not None:
+        test_run_id = matching_run.id
+        if matching_run.status == "passed" and matching_run.target_reached:
             test_compatibility = 100
             confidence_score = 95
             confidence_level = "high"
             behavior_status = "BEHAVIOR_PRESERVED"
-        elif latest_run.status == "passed":
+        elif matching_run.status == "passed":
             test_compatibility = 80
             confidence_score = 80
             confidence_level = "high"

@@ -81,6 +81,36 @@ def test_coverage_repair_loop_service() -> None:
         assert isinstance(final_run.target_reached, bool)
 
 
+def test_unbroken_golden_chain_coverage_repair(client: TestClient) -> None:
+    """Requirement 2: Unbroken Golden-Chain System Test.
+
+    Uploads legacy demo repository, calls generate_unit_tests() for baseline,
+    then executes generate_uncovered_tests() to repair uncovered lines using LLM.
+    Strictly asserts final line coverage >= 60.0%.
+    """
+    repo_id_str = _upload_and_analyze(client, "python_legacy")
+    with SessionLocal() as db:
+        repo = db.get(Repository, uuid.UUID(repo_id_str))
+        assert repo is not None
+
+        # 1. Baseline initial unit test generation
+        from app.services.test_generator import generate_unit_tests
+        baseline_test_case = generate_unit_tests(db, repo)
+        assert baseline_test_case is not None
+
+        # 2. End-to-end automatic coverage repair loop
+        final_run = generate_uncovered_tests(
+            db, repo, max_iterations=3, target_coverage=60.0
+        )
+        assert final_run.id is not None
+        assert final_run.iteration <= 3
+        # Assert unbroken golden-chain requirement
+        assert final_run.status == "passed"
+        assert final_run.target_reached is True
+        assert final_run.line_coverage >= 60.0
+        assert final_run.tests_generated > 0
+
+
 def test_generate_uncovered_404_not_found(client: TestClient) -> None:
     random_id = str(uuid.uuid4())
     response = client.post(f"/api/v1/repositories/{random_id}/tests/generate-uncovered")

@@ -40,6 +40,9 @@ class TestRun(Base):
     repository_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("repositories.id"), nullable=False, index=True
     )
+    tested_proposal_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("refactor_proposals.id"), nullable=True, index=True
+    )
     status: Mapped[str] = mapped_column(String(16), default="queued")
     iteration: Mapped[int] = mapped_column(Integer, default=1)
     tests_generated: Mapped[int] = mapped_column(Integer, default=0)
