@@ -9,6 +9,13 @@ export interface PipelineStageInfo {
   durationSeconds?: number
 }
 
+export interface RepositoryStatusData {
+  repositoryStatus?: string
+  analysisStatus?: string | null
+  currentStage?: string | null
+  pipelineState?: Record<string, PipelineStageInfo>
+}
+
 export interface PipelineStatusCardProps {
   pipelineState?: Record<string, PipelineStageInfo> | null
   currentStage?: string | null

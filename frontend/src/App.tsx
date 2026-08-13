@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { TestsTab } from './components/TestsTab'
 import { RefactorTab } from './components/RefactorTab'
 import { DashboardTab, RepositorySummaryData } from './components/DashboardTab'
-import { PipelineStatusCard } from './components/PipelineStatusCard'
+import { PipelineStatusCard, RepositoryStatusData } from './components/PipelineStatusCard'
 import { TestRunData } from './types/test_run'
 import { RefactorProposal } from './types/refactor'
 import { SafetyScoreData } from './types/safety'
@@ -31,7 +31,7 @@ export function App() {
   const [refactorProposal, setRefactorProposal] = useState<RefactorProposal | null>(null)
   const [safetyData, setSafetyData] = useState<SafetyScoreData | null>(null)
   const [summaryData, setSummaryData] = useState<RepositorySummaryData | null>(null)
-  const [pipelineStatus, setPipelineStatus] = useState<any | null>(null)
+  const [pipelineStatus, setPipelineStatus] = useState<RepositoryStatusData | null>(null)
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
