@@ -25,7 +25,7 @@ _CHUNK = 65536
 
 PYTHON_CMD = (
     "cd /home/codeoracle && "
-    "pytest -s /sandbox/tests -p no:cacheprovider --cov /sandbox/src --cov-branch "
+    "PYTHONPATH=/sandbox/src pytest -s /sandbox/tests -p no:cacheprovider --cov /sandbox/src --cov-branch "
     "--cov-report=json:/home/codeoracle/coverage.json --cov-report=term "
     "--junitxml=/home/codeoracle/junit.xml; RC=$?; "
     "cat /home/codeoracle/coverage.json 2>/dev/null; "
