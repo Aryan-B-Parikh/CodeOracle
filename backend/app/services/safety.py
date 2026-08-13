@@ -255,6 +255,9 @@ def calculate_safety_score(
     if not recommendations:
         recommendations.append("Refactor proposal carries low risk; behavior is well-preserved.")
 
+    from typing import Literal as _Literal
+    from typing import cast as _cast
+
     return SafetyScoreData(
         proposal_id=proposal_record.id,
         test_run_id=test_run_id,
@@ -262,13 +265,16 @@ def calculate_safety_score(
         proposed_checksum=proposed_checksum,
         total=total,
         confidence_score=confidence_score,
-        confidence_level=confidence_level,
+        confidence_level=_cast(_Literal["high", "medium", "low"], confidence_level),
         api_compatibility=api_compatibility,
         test_compatibility=test_compatibility,
         dependency_impact=dependency_impact,
         behavioral_risk=behavioral_risk,
         risk_level=risk_level,  # type: ignore[arg-type]
-        behavior_status=behavior_status,
+        behavior_status=_cast(
+            _Literal["BEHAVIOR_PRESERVED", "BEHAVIOR_MUTATED", "UNVERIFIED"],
+            behavior_status,
+        ),
         breaking_changes=breaking_changes,
         recommendations=recommendations,
     )

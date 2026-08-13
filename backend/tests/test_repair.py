@@ -1,9 +1,12 @@
 """Unit and integration tests for the coverage repair loop (T-15)."""
 
 import io
+import os
 import uuid
 import zipfile
 from pathlib import Path
+
+import pytest
 
 from app.db.models.repository import Repository
 from app.db.session import SessionLocal
@@ -81,6 +84,10 @@ def test_coverage_repair_loop_service() -> None:
         assert isinstance(final_run.target_reached, bool)
 
 
+@pytest.mark.skipif(
+    not os.environ.get("LLM_API_KEY"),
+    reason="Golden-chain test requires a live LLM (LLM_API_KEY not set)",
+)
 def test_unbroken_golden_chain_coverage_repair(client: TestClient) -> None:
     """Requirement 2: Unbroken Golden-Chain System Test.
 

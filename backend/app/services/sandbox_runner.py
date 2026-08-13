@@ -9,6 +9,7 @@ import tempfile
 import uuid
 from collections import Counter
 from pathlib import Path
+from typing import Any as _Any
 
 from sqlalchemy.orm import Session
 
@@ -22,10 +23,13 @@ SANDBOX_DIR = Path(__file__).resolve().parents[2] / "sandbox"
 if str(SANDBOX_DIR) not in sys.path:
     sys.path.insert(0, str(SANDBOX_DIR))
 
+sandbox_run: _Any = None
+sandbox_stage: _Any = None
 try:
-    import run as sandbox_run  # type: ignore[import-not-found]
-    import stage as sandbox_stage  # type: ignore[import-not-found]
+    import importlib as _il
 
+    sandbox_run = _il.import_module("run")
+    sandbox_stage = _il.import_module("stage")
     _SANDBOX_AVAILABLE = True
 except Exception:
     _SANDBOX_AVAILABLE = False
@@ -119,7 +123,10 @@ def execute_sandbox_test_run(
         root_dir = get_settings().upload_dir / str(repository.id)
         root_dir.mkdir(parents=True, exist_ok=True)
 
-    with tempfile.TemporaryDirectory(prefix="codeoracle-run-") as tmp_dir, tempfile.TemporaryDirectory(prefix="codeoracle-tests-") as input_tests_tmp:
+    with (
+        tempfile.TemporaryDirectory(prefix="codeoracle-run-") as tmp_dir,
+        tempfile.TemporaryDirectory(prefix="codeoracle-tests-") as input_tests_tmp,
+    ):
         staging_dir = Path(tmp_dir)
         input_tests_dir = Path(input_tests_tmp)
 

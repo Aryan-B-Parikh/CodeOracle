@@ -28,8 +28,8 @@ def _generate_10k_loc_zip() -> bytes:
     """Dynamically generate synthetic zip archive containing 10,000-10,500 scanner LOC."""
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
-        # 63 modules * ~162 lines per module = 10,206 LOC
-        for m in range(1, 64):
+        # 75 modules * ~137 lines per module = 10,275 LOC
+        for m in range(1, 76):
             lines: list[str] = [
                 f'"""Module {m} enterprise transaction processor."""',
                 "import os",
