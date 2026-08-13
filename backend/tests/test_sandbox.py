@@ -61,6 +61,31 @@ def test_staging_enforces_tests_size_limit(
         sandbox_stage.stage(source, "python", tests, tmp_path / "stage")
 
 
+def test_staging_normalizes_permissions_for_sandbox_user(tmp_path: Path) -> None:
+    """Staged dirs must be traversable by the unprivileged container user.
+
+    Host temp dirs are 0700 and copytree preserves that mode; on Linux the
+    sandbox user (uid 1000) would otherwise hit EACCES walking /sandbox/tests
+    and pytest would never emit a junit report (Docker Desktop masks this).
+    """
+    source = tmp_path / "repo_src"
+    source.mkdir()
+    (source / "mod.py").write_text("def f():\n    return 1\n")
+    tests = tmp_path / "repo_tests"
+    tests.mkdir()
+    (tests / "test_mod.py").write_text("def test_f():\n    assert True\n")
+    stage_dir = tmp_path / "stage"
+
+    sandbox_stage.stage(source, "python", tests, stage_dir)
+
+    for staged in (stage_dir, stage_dir / "src", stage_dir / "tests"):
+        mode = staged.stat().st_mode
+        # Other-read + other-search: the uid-1000 sandbox user can traverse.
+        assert mode & 0o005, f"{staged} is not traversable by others ({oct(mode)})"
+    mode = (stage_dir / "tests" / "test_mod.py").stat().st_mode
+    assert mode & 0o004, f"test file not readable by others ({oct(mode)})"
+
+
 def test_parse_tests_report_pytest_junit() -> None:
     stdout = (
         '<?xml version="1.0"?><testsuites><testsuite name="pytest" tests="3" '

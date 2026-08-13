@@ -118,7 +118,15 @@ def test_unbroken_golden_chain_coverage_repair(client: TestClient) -> None:
 
         if is_docker_sandbox_ready():
             assert final_run.tests_generated > 0, (
-                "Golden-chain: no tests were generated — repair loop did not run"
+                "Golden-chain: no tests were generated — repair loop did not run; "
+                f"status={final_run.status}, iteration={final_run.iteration}, "
+                f"lineCoverage={final_run.line_coverage}, "
+                f"branchCoverage={final_run.branch_coverage}, "
+                f"testsPassed={final_run.tests_passed}, "
+                f"testsFailed={final_run.tests_failed}, "
+                f"targetReached={final_run.target_reached}, "
+                f"uncoveredLines={final_run.uncovered_lines}\n"
+                f"--- sandbox log tail ---\n{(final_run.log or '')[-3000:]}"
             )
             assert final_run.status == "passed", (
                 f"Golden-chain: generated tests did not pass "

@@ -7,6 +7,7 @@ The container mounts <stage> read-only at /sandbox, so the original
 repository is never touched.
 """
 
+import os
 import shutil
 from pathlib import Path
 
@@ -17,6 +18,24 @@ PYTHON_CONFTEST = "import sys\nsys.path.insert(0, '/sandbox/src')\n"
 
 class StageLimitError(Exception):
     pass
+
+
+def _normalize_permissions(stage_dir: Path) -> None:
+    """Make the staged tree traversable and readable by the sandbox user.
+
+    Host staging directories (e.g. ``tempfile.TemporaryDirectory``) default to
+    mode 0700 and ``shutil.copytree`` preserves that mode onto the staged
+    ``tests/`` dir. The container runs as an unprivileged user (uid 1000), so
+    on Linux hosts pytest would hit EACCES walking ``/sandbox/tests`` and
+    never emit a junit report. Docker Desktop does not enforce Unix
+    permissions, which is why this only breaks on Linux CI.
+    """
+    stage_dir.chmod(0o755)
+    for path in stage_dir.rglob("*"):
+        if path.is_dir():
+            path.chmod(0o755)
+        elif path.is_file():
+            path.chmod(0o644)
 
 
 def _total_bytes(path: Path) -> int:
@@ -91,4 +110,5 @@ def stage(source_dir: Path, language: str, tests_dir: Path | None, stage_dir: Pa
         _stage_python(source_dir, tests_dir, stage_dir)
     else:
         _stage_java(source_dir, tests_dir, stage_dir)
+    _normalize_permissions(stage_dir)
     _enforce_limits(stage_dir, tests_dir)
