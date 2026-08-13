@@ -50,12 +50,7 @@ def detect_breaking_changes(
     and maps callers to `file:line` locations.
     """
     affected_callers: list[str] = []
-    call_rows = (
-        db.query(Call)
-        .filter(Call.callee_id == entity.id)
-        .limit(20)
-        .all()
-    )
+    call_rows = db.query(Call).filter(Call.callee_id == entity.id).limit(20).all()
     for call in call_rows:
         if call.caller_id is None:
             continue
@@ -67,7 +62,6 @@ def detect_breaking_changes(
 
     breaking_changes: list[BreakingChangeItem] = []
 
-    # --- AST Parameter Analysis ---
     lang = (entity.language or (entity.file.language if entity.file else "")).lower()
     if lang == "python":
         orig_params = _extract_python_params(original_code)
@@ -98,7 +92,6 @@ def detect_breaking_changes(
                         )
                     )
 
-    # --- LLM Verification ---
     callers_summary = ", ".join(affected_callers) if affected_callers else "none"
     user_prompt = BREAKING_CHANGE_USER.format(
         entity=entity.name,
@@ -123,7 +116,6 @@ def detect_breaking_changes(
                     if impact not in ("HIGH", "MEDIUM", "LOW"):
                         impact = "MEDIUM"
                     reason = str(item.get("reason", "Potential API incompatibility"))
-                    # Avoid duplicate AST findings
                     if not any(b.reason == reason for b in breaking_changes):
                         breaking_changes.append(
                             BreakingChangeItem(
@@ -144,17 +136,14 @@ def calculate_safety_score(
     repository: Repository,
     proposal_record: RefactorProposalRecord,
 ) -> SafetyScoreData:
-    """Compute the 0-100 Refactor Safety Score (T-19).
-
-    Sub-scores:
-      1. api_compatibility: 100 - HIGH(-40) - MEDIUM(-20) - LOW(-5)
-      2. test_compatibility: 100 if tests pass cleanly with >60% coverage
-      3. dependency_impact: based on caller fan-in and graph complexity
-      4. behavioral_risk: based on entity complexity and behavioral diffs
-    """
+    """Compute the 0-100 Refactor Safety Score (T-19)."""
     entity = proposal_record.entity or db.get(Entity, proposal_record.entity_id)
+    if entity is None:
+        raise ValueError(
+            f"Refactor proposal {proposal_record.id} references missing entity "
+            f"{proposal_record.entity_id}"
+        )
 
-    # 1. Detect Breaking Changes & API Compatibility
     original_code = proposal_record.original
     proposed_code = proposal_record.proposed
     breaking_changes = detect_breaking_changes(
@@ -175,7 +164,6 @@ def calculate_safety_score(
             api_penalty += 5
     api_compatibility = max(0, 100 - api_penalty)
 
-    # 2. Test Compatibility Sub-score
     latest_run = (
         db.query(TestRun)
         .filter(TestRun.repository_id == repository.id)
@@ -190,24 +178,21 @@ def calculate_safety_score(
         else:
             test_compatibility = 40
     else:
-        test_compatibility = 75  # Baseline assumption if no test run yet
+        test_compatibility = 75
 
-    # 3. Dependency Impact Sub-score
     caller_count = (
         db.query(Call)
         .filter(Call.callee_id == proposal_record.entity_id)
         .count()
     )
-    complexity = entity.complexity if entity else 1
+    complexity = entity.complexity
     dep_penalty = min(60, caller_count * 12 + complexity * 2)
     dependency_impact = max(40, 100 - dep_penalty)
 
-    # 4. Behavioral Risk Sub-score
     behavioral_diff_count = len(proposal_record.behavioral_differences or [])
     beh_penalty = min(70, complexity * 5 + behavioral_diff_count * 15)
     behavioral_risk = max(30, 100 - beh_penalty)
 
-    # Calculate Total Weighted Score
     total = round(
         0.35 * api_compatibility
         + 0.25 * test_compatibility
@@ -216,7 +201,6 @@ def calculate_safety_score(
     )
     total = max(0, min(100, total))
 
-    # Risk level classification
     if total >= 80:
         risk_level = "low"
     elif total >= 50:
@@ -224,7 +208,6 @@ def calculate_safety_score(
     else:
         risk_level = "high"
 
-    # Generate Recommendations
     recommendations: list[str] = []
     if api_compatibility < 80:
         recommendations.append(
