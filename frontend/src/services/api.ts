@@ -292,6 +292,9 @@ export async function fetchRepositoryGraph(repositoryId: string): Promise<GraphE
 
 export async function fetchLatestTestRun(repositoryId: string): Promise<TestRunEnvelope> {
   const res = await fetch(`${API_BASE}/repositories/${repositoryId}/tests/latest`)
+  if (res.status === 404) {
+    return { data: null, error: null } as unknown as TestRunEnvelope
+  }
   if (!res.ok) {
     throw new Error(`Failed to fetch latest test run: status ${res.status}`)
   }

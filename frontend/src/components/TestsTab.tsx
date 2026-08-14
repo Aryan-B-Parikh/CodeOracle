@@ -44,8 +44,10 @@ export const TestsTab: React.FC<TestsTabProps> = ({
   }
 
   const isPassed = testRunData.targetReached || testRunData.statusLabel === 'PASSED'
-  const linePercent = Math.min(100, Math.max(0, testRunData.lineCoverage))
-  const branchPercent = Math.min(100, Math.max(0, testRunData.branchCoverage))
+  const linePercent = Math.min(100, Math.max(0, testRunData.lineCoverage || 0))
+  const branchPercent = Math.min(100, Math.max(0, testRunData.branchCoverage || 0))
+  const uncoveredLines = testRunData.uncoveredLines || []
+  const failedTests = testRunData.failedTests || []
 
   return (
     <div style={styles.container} data-testid="tests-tab">
@@ -53,14 +55,14 @@ export const TestsTab: React.FC<TestsTabProps> = ({
         <div style={styles.headerRow}>
           <div>
             <span style={styles.title}>Test Execution & Coverage</span>
-            <span style={styles.iterationBadge}>Iteration #{testRunData.iteration}</span>
+            <span style={styles.iterationBadge}>Iteration #{testRunData.iteration || 1}</span>
           </div>
           <div style={styles.headerRight}>
             <span
               style={{ ...styles.statusBadge, backgroundColor: isPassed ? '#059669' : '#dc2626' }}
               data-testid="status-badge"
             >
-              {isPassed ? 'PASSED' : 'FAILED'} (Target: {testRunData.target}%)
+              {isPassed ? 'PASSED' : 'FAILED'} (Target: {testRunData.target || 60}%)
             </span>
             {onGenerateUncovered && (
               <button
@@ -69,24 +71,35 @@ export const TestsTab: React.FC<TestsTabProps> = ({
                 style={styles.primaryButton}
                 data-testid="generate-uncovered-btn"
               >
-                {loading ? 'Running Repair Loop...' : 'Generate Tests for Uncovered Code'}
+                {loading ? 'Running...' : 'Generate Tests for Uncovered'}
               </button>
             )}
           </div>
         </div>
 
-        <div style={styles.metricsGrid}>
-          <div style={styles.metricItem}><span style={styles.metricLabel}>Tests Generated</span><span style={styles.metricValue}>{testRunData.testsGenerated}</span></div>
-          <div style={styles.metricItem}><span style={styles.metricLabel}>Passed</span><span style={{ ...styles.metricValue, color: '#10b981' }}>{testRunData.testsPassed}</span></div>
-          <div style={styles.metricItem}><span style={styles.metricLabel}>Failed</span><span style={{ ...styles.metricValue, color: testRunData.testsFailed > 0 ? '#ef4444' : '#9ca3af' }}>{testRunData.testsFailed}</span></div>
-          <div style={styles.metricItem}><span style={styles.metricLabel}>Line Coverage</span><span style={{ ...styles.metricValue, color: linePercent >= testRunData.target ? '#10b981' : '#f59e0b' }} data-testid="line-coverage-value">{testRunData.lineCoverage}%</span></div>
-          <div style={styles.metricItem}><span style={styles.metricLabel}>Branch Coverage</span><span style={styles.metricValue} data-testid="branch-coverage-value">{testRunData.branchCoverage}%</span></div>
+        <div style={styles.kpiRow}>
+          <div style={styles.kpiItem} data-testid="line-coverage-kpi">
+            <span style={styles.kpiValue}>{linePercent}%</span>
+            <span style={styles.kpiLabel}>Line Coverage</span>
+          </div>
+          <div style={styles.kpiItem} data-testid="branch-coverage-kpi">
+            <span style={styles.kpiValue}>{branchPercent}%</span>
+            <span style={styles.kpiLabel}>Branch Coverage</span>
+          </div>
+          <div style={styles.kpiItem} data-testid="tests-count-kpi">
+            <span style={styles.kpiValue}>{testRunData.testsGenerated || 0}</span>
+            <span style={styles.kpiLabel}>Tests Generated</span>
+          </div>
+          <div style={styles.kpiItem} data-testid="tests-passed-kpi">
+            <span style={styles.kpiValue}>{testRunData.testsPassed || 0}</span>
+            <span style={styles.kpiLabel}>Tests Passed</span>
+          </div>
         </div>
 
         <div style={styles.progressSection}>
           <div style={styles.progressRow}>
-            <span style={styles.progressLabel}>Line Coverage ({linePercent}% / {testRunData.target}% target)</span>
-            <div style={styles.progressTrack}><div style={{ ...styles.progressBar, width: `${linePercent}%`, backgroundColor: linePercent >= testRunData.target ? '#10b981' : '#f59e0b' }} /></div>
+            <span style={styles.progressLabel}>Line Coverage ({linePercent}%)</span>
+            <div style={styles.progressTrack}><div style={{ ...styles.progressBar, width: `${linePercent}%`, backgroundColor: '#10b981' }} /></div>
           </div>
           <div style={styles.progressRow}>
             <span style={styles.progressLabel}>Branch Coverage ({branchPercent}%)</span>
@@ -97,13 +110,13 @@ export const TestsTab: React.FC<TestsTabProps> = ({
 
       <div style={styles.contentGrid}>
         <div style={styles.panel}>
-          <h4 style={styles.panelTitle}>Uncovered Lines ({testRunData.uncoveredLines.length})</h4>
+          <h4 style={styles.panelTitle}>Uncovered Lines ({uncoveredLines.length})</h4>
           <p style={styles.panelSubtitle}>Click an uncovered line to inspect location context.</p>
-          {testRunData.uncoveredLines.length === 0 ? (
+          {uncoveredLines.length === 0 ? (
             <div style={styles.successBox}>All target code lines and branches are fully covered!</div>
           ) : (
             <div style={styles.uncoveredList}>
-              {testRunData.uncoveredLines.map((item, idx) => {
+              {uncoveredLines.map((item, idx) => {
                 const isSelected = selectedLine?.file === item.file && selectedLine?.line === item.line
                 return (
                   <div key={`${item.file}-${item.line}-${idx}`} onClick={() => setSelectedLine(item)} style={{ ...styles.uncoveredItem, backgroundColor: isSelected ? '#1e293b' : '#0f172a', borderColor: isSelected ? '#38bdf8' : '#334155' }} data-testid={`uncovered-line-${idx}`}>
@@ -125,10 +138,10 @@ export const TestsTab: React.FC<TestsTabProps> = ({
         </div>
       </div>
 
-      {testRunData.failedTests.length > 0 && (
+      {failedTests.length > 0 && (
         <div style={styles.failedSection}>
-          <h4 style={{ ...styles.panelTitle, color: '#f87171' }}>Failed Test Cases ({testRunData.failedTests.length})</h4>
-          {testRunData.failedTests.map((failed, idx) => (
+          <h4 style={{ ...styles.panelTitle, color: '#f87171' }}>Failed Test Cases ({failedTests.length})</h4>
+          {failedTests.map((failed, idx) => (
             <div key={idx} style={styles.failedCard}>
               <span style={styles.failedName}>{failed.name}</span>
               {failed.targetEntity && <span style={styles.failedEntity}>Target: {failed.targetEntity}</span>}
