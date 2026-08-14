@@ -100,26 +100,11 @@ def run_analysis_task(repository_id_raw: str) -> None:
         )
 
         root = str(repository_root(repository))
-        signatures = [
-            parse_file_task.s(repository_id_raw, root, path, language)
-            for path, language in files
-        ]
         try:
-            if celery_app.conf.task_always_eager:
-                # Inline execution for tests/CI (no broker): each task runs
-                # synchronously, results in submission order.
-                serialized = [
-                    signatures[i].apply().get(disable_sync_subtasks=False)
-                    for i in range(len(signatures))
-                ]
-            else:
-                # Parallel fan-out on the prefork pool; the driver joins the
-                # group result (--without-gossip/--without-mingle recommended).
-                job = group(signatures).apply_async()
-                serialized = job.get(
-                    timeout=ANALYSIS_TIMEOUT_SECONDS,
-                    disable_sync_subtasks=False,
-                )
+            serialized = [
+                parse_file_task(repository_id_raw, root, path, language)
+                for path, language in files
+            ]
         except Exception as exc:  # noqa: BLE001
             logger.error("repo=%s parse stage failed: %s", repository_id, exc)
             _fail(repository_id, analysis.id, "parsing")

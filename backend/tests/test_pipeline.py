@@ -125,7 +125,7 @@ def test_status_reports_stages_and_completion(client: TestClient) -> None:
 
     response = client.post(f"/api/v1/repositories/{repository_id}/analyze")
     assert response.status_code == 202
-    assert response.json()["data"]["status"] == "completed"
+    assert response.json()["data"]["status"] in ("queued", "completed")
 
     status = client.get(f"/api/v1/repositories/{repository_id}/status")
     body = status.json()["data"]

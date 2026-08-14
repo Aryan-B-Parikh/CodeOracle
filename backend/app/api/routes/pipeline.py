@@ -3,7 +3,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.models.analysis import Analysis
@@ -32,6 +32,7 @@ _RUNNING_STATES = ("queued", "running")
 def start_analysis(
     repository_id: uuid.UUID,
     db: DbSession,
+    background_tasks: BackgroundTasks,
 ) -> AnalysisEnvelope:
     # Lock the repository row for the decision/create/commit sequence. This
     # prevents two concurrent requests from both observing "no analysis in
@@ -59,10 +60,10 @@ def start_analysis(
     db.refresh(analysis)
 
     try:
-        run_analysis_task.delay(str(repository_id))
+        # Background task runs directly within FastAPI process so single-instance deployments
+        # on Render / Cloud platforms execute immediately without requiring a standalone Celery worker.
+        background_tasks.add_task(run_analysis_task, str(repository_id))
     except Exception as exc:  # noqa: BLE001
-        # Never leave the UI polling a permanently queued analysis when the
-        # broker is unavailable at enqueue time.
         analysis.status = "failed"
         repository.status = "failed"
         db.commit()
