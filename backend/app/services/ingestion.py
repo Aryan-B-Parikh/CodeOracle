@@ -5,6 +5,7 @@ from __future__ import annotations
 import ipaddress
 import os
 import shutil
+import socket
 import subprocess
 import zipfile
 from pathlib import Path
@@ -59,8 +60,23 @@ def validate_git_url(url: str) -> str:
                 detail="Private and loopback Git IP addresses are not permitted",
             )
     except ValueError:
-        # Host is a valid domain name
-        pass
+        # Host is a domain name — resolve DNS to prevent SSRF to private IPs
+        if os.environ.get("CODEORACLE_SKIP_DNS_CHECK") != "1":
+            try:
+                addr_info = socket.getaddrinfo(hostname, None, proto=socket.IPPROTO_TCP)
+                for _, _, _, _, sockaddr in addr_info:
+                    resolved_ip = ipaddress.ip_address(sockaddr[0])
+                    if (
+                        resolved_ip.is_private
+                        or resolved_ip.is_loopback
+                        or resolved_ip.is_link_local
+                    ):
+                        raise HTTPException(
+                            status_code=422,
+                            detail=f"Host '{hostname}' resolves to private/internal IP address",
+                        )
+            except (socket.gaierror, OSError):
+                pass
 
     return cleaned
 

@@ -198,3 +198,54 @@ def test_import_real_github_repo(client: TestClient) -> None:
     data = response.json()["data"]
     assert data["id"]
     assert data["sourceType"] == "github"
+
+
+def test_delete_repository_cascade_cleanup(client: TestClient) -> None:
+    """Verify DELETE /repositories/{id} cascades across all tables and deletes disk folder."""
+    import uuid
+    from app.config import get_settings
+    from app.db.models.analysis import Analysis
+    from app.db.models.call import Call
+    from app.db.models.chunk import Chunk
+    from app.db.models.entity import Entity
+    from app.db.models.file import File as FileModel
+    from app.db.models.repository import Repository
+    from app.db.session import SessionLocal
+    from app.services.analysis import analyze_repository
+
+    payload = make_zip({"main.py": "def foo():\n    return 42\n"})
+    upload_res = _upload(client, payload, "cascade_test.zip")
+    assert upload_res.status_code == 201
+    repo_id_str = upload_res.json()["data"]["id"]
+    repo_id = uuid.UUID(repo_id_str)
+
+    settings = get_settings()
+    repo_dir = settings.upload_dir / repo_id_str
+
+    with SessionLocal() as db:
+        repo = db.get(Repository, repo_id)
+        assert repo is not None
+        analyze_repository(db, repo)
+
+        # Assert facts exist
+        assert db.query(FileModel).filter(FileModel.repository_id == repo_id).count() >= 1
+        assert db.query(Entity).filter(Entity.repository_id == repo_id).count() >= 1
+        assert repo_dir.exists()
+
+    # Execute cascade deletion
+    del_res = client.delete(f"/api/v1/repositories/{repo_id_str}")
+    assert del_res.status_code == 200
+    assert del_res.json()["data"]["deleted"] is True
+
+    # Assert complete database cascade cleanup
+    with SessionLocal() as db:
+        assert db.get(Repository, repo_id) is None
+        assert db.query(FileModel).filter(FileModel.repository_id == repo_id).count() == 0
+        assert db.query(Entity).filter(Entity.repository_id == repo_id).count() == 0
+        assert db.query(Call).filter(Call.repository_id == repo_id).count() == 0
+        assert db.query(Chunk).filter(Chunk.repository_id == repo_id).count() == 0
+        assert db.query(Analysis).filter(Analysis.repository_id == repo_id).count() == 0
+
+    # Assert complete filesystem cleanup
+    assert not repo_dir.exists()
+

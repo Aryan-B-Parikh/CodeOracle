@@ -16,12 +16,12 @@ CodeOracle turns undocumented legacy repositories into understandable architectu
 
 | Layer | Tech |
 |---|---|
-| Frontend | React + Vite + Tailwind, Monaco, React Flow, Recharts |
-| Backend | FastAPI, Celery + Redis |
+| Frontend | React 18, TypeScript, Vite, Interactive SVG Graph Engine, Unified Diff Viewer, Design System |
+| Backend | FastAPI, SQLAlchemy, Celery + Redis |
 | Analysis | Tree-sitter (+ `tree-sitter-java`), Python `ast`, NetworkX, Radon |
-| Storage | PostgreSQL 15 + pgvector |
-| AI | LLM API behind a provider-agnostic gateway |
-| Execution | Docker sandbox (pytest/coverage.py, JUnit/JaCoCo) |
+| Storage | PostgreSQL 15 + pgvector (or SQLite for offline testing) |
+| AI | Provider-agnostic LLM Gateway (OpenAI, Anthropic, Mock) |
+| Execution | Docker sandbox (pytest/coverage.py, JUnit/JaCoCo) with fail-closed security |
 
 ## Quickstart
 
