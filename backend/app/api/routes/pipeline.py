@@ -33,9 +33,18 @@ def start_analysis(
     repository_id: uuid.UUID,
     db: DbSession,
 ) -> AnalysisEnvelope:
-    repository = db.get(Repository, repository_id)
+    # Lock the repository row for the decision/create/commit sequence. This
+    # prevents two concurrent requests from both observing "no analysis in
+    # progress" and enqueueing duplicate analysis jobs on PostgreSQL.
+    repository = (
+        db.query(Repository)
+        .filter(Repository.id == repository_id)
+        .with_for_update()
+        .first()
+    )
     if repository is None:
         raise HTTPException(status_code=404, detail="repository not found")
+
     existing = latest_analysis(db, repository_id)
     if existing is not None and existing.status in _RUNNING_STATES:
         raise HTTPException(status_code=409, detail="analysis already in progress")
@@ -49,8 +58,19 @@ def start_analysis(
     db.commit()
     db.refresh(analysis)
 
-    run_analysis_task.delay(str(repository_id))
-    db.refresh(analysis)
+    try:
+        run_analysis_task.delay(str(repository_id))
+    except Exception as exc:  # noqa: BLE001
+        # Never leave the UI polling a permanently queued analysis when the
+        # broker is unavailable at enqueue time.
+        analysis.status = "failed"
+        repository.status = "failed"
+        db.commit()
+        raise HTTPException(
+            status_code=503,
+            detail="analysis worker is unavailable; please retry",
+        ) from exc
+
     return AnalysisEnvelope(data=AnalysisOut.model_validate(analysis))
 
 
