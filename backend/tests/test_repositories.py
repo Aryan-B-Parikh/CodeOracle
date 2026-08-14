@@ -107,7 +107,7 @@ def test_upload_mixed_unsupported_breakdown(client: TestClient) -> None:
 
 
 class _FakeUpload:
-    def __init__(self, chunks: list[bytes]) -> None:
+    def __init__(self, chunks: list[bytes]):
         self._chunks = chunks
         self._index = 0
 
@@ -201,19 +201,25 @@ def test_import_real_github_repo(client: TestClient) -> None:
 
 
 def test_delete_repository_cascade_cleanup(client: TestClient) -> None:
-    """Verify DELETE /repositories/{id} cascades across all tables and deletes disk folder."""
+    """Verify DELETE /repositories/{id} removes every repository-owned record and disk data."""
     import uuid
+
     from app.config import get_settings
     from app.db.models.analysis import Analysis
     from app.db.models.call import Call
     from app.db.models.chunk import Chunk
     from app.db.models.entity import Entity
     from app.db.models.file import File as FileModel
+    from app.db.models.import_ import Import
+    from app.db.models.inheritance import Inheritance
+    from app.db.models.refactor_proposal import RefactorProposalRecord
     from app.db.models.repository import Repository
+    from app.db.models.test_case import TestCase
+    from app.db.models.test_run import TestRun
     from app.db.session import SessionLocal
     from app.services.analysis import analyze_repository
 
-    payload = make_zip({"main.py": "def foo():\n    return 42\n"})
+    payload = make_zip({"main.py": "class Child(Base):\n    def foo(self):\n        return 42\n"})
     upload_res = _upload(client, payload, "cascade_test.zip")
     assert upload_res.status_code == 201
     repo_id_str = upload_res.json()["data"]["id"]
@@ -227,25 +233,28 @@ def test_delete_repository_cascade_cleanup(client: TestClient) -> None:
         assert repo is not None
         analyze_repository(db, repo)
 
-        # Assert facts exist
         assert db.query(FileModel).filter(FileModel.repository_id == repo_id).count() >= 1
         assert db.query(Entity).filter(Entity.repository_id == repo_id).count() >= 1
+        assert db.query(Import).join(FileModel).filter(FileModel.repository_id == repo_id).count() >= 0
+        assert db.query(Inheritance).filter(Inheritance.repository_id == repo_id).count() >= 0
         assert repo_dir.exists()
 
-    # Execute cascade deletion
     del_res = client.delete(f"/api/v1/repositories/{repo_id_str}")
     assert del_res.status_code == 200
     assert del_res.json()["data"]["deleted"] is True
+    assert del_res.json()["data"]["fs_cleaned"] is True
 
-    # Assert complete database cascade cleanup
     with SessionLocal() as db:
         assert db.get(Repository, repo_id) is None
         assert db.query(FileModel).filter(FileModel.repository_id == repo_id).count() == 0
         assert db.query(Entity).filter(Entity.repository_id == repo_id).count() == 0
         assert db.query(Call).filter(Call.repository_id == repo_id).count() == 0
         assert db.query(Chunk).filter(Chunk.repository_id == repo_id).count() == 0
+        assert db.query(Import).join(FileModel).filter(FileModel.repository_id == repo_id).count() == 0
+        assert db.query(Inheritance).filter(Inheritance.repository_id == repo_id).count() == 0
         assert db.query(Analysis).filter(Analysis.repository_id == repo_id).count() == 0
+        assert db.query(TestCase).join(TestRun).filter(TestRun.repository_id == repo_id).count() == 0
+        assert db.query(TestRun).filter(TestRun.repository_id == repo_id).count() == 0
+        assert db.query(RefactorProposalRecord).filter(RefactorProposalRecord.repository_id == repo_id).count() == 0
 
-    # Assert complete filesystem cleanup
     assert not repo_dir.exists()
-
