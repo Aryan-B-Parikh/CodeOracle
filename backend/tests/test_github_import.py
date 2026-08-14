@@ -102,29 +102,93 @@ def test_github_repository_import_e2e(
         assert "python" in repo.languages
 
 
-def test_github_import_security_rejections(client: TestClient) -> None:
+def test_github_import_security_rejections(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Verify security rejection of unauthorized schemes and local addresses."""
-    # 1. file:// without testing override
+    # 1. file:// scheme
     res = client.post("/api/v1/repositories/import", json={"github_url": "file:///etc/passwd"})
     assert res.status_code == 422
 
     # 2. ssh:// scheme
-    res = client.post("/api/v1/repositories/import", json={"github_url": "ssh://git@internal-server/repo.git"})
+    res = client.post(
+        "/api/v1/repositories/import",
+        json={"github_url": "ssh://git@internal-server/repo.git"},
+    )
     assert res.status_code == 422
 
     # 3. git@ scp syntax
-    res = client.post("/api/v1/repositories/import", json={"github_url": "git@github.com:owner/repo.git"})
+    res = client.post(
+        "/api/v1/repositories/import",
+        json={"github_url": "git@github.com:owner/repo.git"},
+    )
     assert res.status_code == 422
 
     # 4. localhost SSRF attempt
-    res = client.post("/api/v1/repositories/import", json={"github_url": "http://localhost:8080/repo.git"})
+    res = client.post(
+        "/api/v1/repositories/import",
+        json={"github_url": "http://localhost:8080/repo.git"},
+    )
     assert res.status_code == 422
 
-    # 5. loopback IP SSRF attempt
+    # 5. IPv4 loopback IP SSRF attempt
     res = client.post("/api/v1/repositories/import", json={"github_url": "https://127.0.0.1/repo.git"})
     assert res.status_code == 422
 
-    # 6. private network IP SSRF attempt
-    res = client.post("/api/v1/repositories/import", json={"github_url": "https://192.168.1.1/repo.git"})
+    # 6. IPv4 private network IP SSRF attempt (10.x, 172.16.x, 192.168.x)
+    for priv_ip in ["10.0.0.1", "172.16.0.1", "192.168.1.1"]:
+        res = client.post(
+            "/api/v1/repositories/import",
+            json={"github_url": f"https://{priv_ip}/repo.git"},
+        )
+        assert res.status_code == 422
+
+    # 7. IPv4 link-local (169.254.x)
+    res = client.post(
+        "/api/v1/repositories/import",
+        json={"github_url": "https://169.254.169.254/repo.git"},
+    )
     assert res.status_code == 422
+
+    # 8. IPv4 reserved & unspecified (0.0.0.0, 240.0.0.1, 100.64.0.1)
+    for res_ip in ["0.0.0.0", "240.0.0.1", "100.64.0.1"]:
+        res = client.post(
+            "/api/v1/repositories/import",
+            json={"github_url": f"https://{res_ip}/repo.git"},
+        )
+        assert res.status_code == 422
+
+    # 9. IPv6 loopback, link-local, and unique local
+    for ip6 in ["::1", "fe80::1", "fc00::1"]:
+        res = client.post(
+            "/api/v1/repositories/import",
+            json={"github_url": f"https://[{ip6}]/repo.git"},
+        )
+        assert res.status_code == 422
+
+    # 10. DNS failure fail-closed rejection
+    res = client.post(
+        "/api/v1/repositories/import",
+        json={"github_url": "https://nonexistent-domain-that-fails-dns-xyz987.invalid/repo.git"},
+    )
+    assert res.status_code == 422
+    assert "DNS lookup failed" in res.json()["detail"] or "Failed to resolve" in res.json()["detail"]
+
+    # 11. Mixed DNS A + AAAA resolution where one IP is private
+    import socket
+
+    def fake_getaddrinfo(host: str, port: object, **kwargs: object) -> list[object]:
+        return [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0)),  # Public IPv4
+            (socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("fe80::1", 0, 0, 0)),  # Private IPv6
+        ]
+
+    monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
+    res = client.post(
+        "/api/v1/repositories/import",
+        json={"github_url": "https://mixed-resolution.example.com/repo.git"},
+    )
+    assert res.status_code == 422
+    assert "restricted IP" in res.json()["detail"]
+
 
