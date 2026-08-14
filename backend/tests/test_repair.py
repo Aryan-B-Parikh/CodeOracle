@@ -169,6 +169,29 @@ def test_unbroken_golden_chain_coverage_repair(client: TestClient) -> None:
                 f"Golden-chain: line coverage {final_run.line_coverage}% < 60.0%"
             )
             assert final_run.target_reached is True
+
+            from tests.benchmark_report import write_artifact
+
+            artifact = write_artifact(
+                "golden_chain",
+                {
+                    "benchmark": "golden-chain-coverage-repair",
+                    "fixture": "python_legacy",
+                    "targetCoverage": 60.0,
+                    "status": final_run.status,
+                    "iteration": final_run.iteration,
+                    "lineCoverage": final_run.line_coverage,
+                    "branchCoverage": final_run.branch_coverage,
+                    "testsGenerated": final_run.tests_generated,
+                    "testsPassed": final_run.tests_passed,
+                    "testsFailed": final_run.tests_failed,
+                    "targetReached": final_run.target_reached,
+                    "uncoveredLines": final_run.uncovered_lines,
+                    "repairBranchTests": len(repair_tests),
+                    "pass": True,
+                },
+            )
+            print(f"Artifact={artifact}")
         else:
             # Fail-closed contract: sandbox unavailable → status failed, no fake metrics
             assert final_run.status == "failed"

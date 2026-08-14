@@ -85,6 +85,13 @@ jobs:
         run: pytest backend/tests/test_repair.py backend/tests/test_sandbox.py -q
         env:
           DATABASE_URL: sqlite://
+      - name: Upload benchmark artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-sandbox
+          path: benchmark-results/
+          if-no-files-found: warn
 
   frontend:
     name: Frontend quality gates

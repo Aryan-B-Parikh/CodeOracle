@@ -1,0 +1,92 @@
+{
+  "benchmark": "golden-chain-coverage-repair",
+  "branchCoverage": 56.25,
+  "fixture": "python_legacy",
+  "iteration": 2,
+  "lineCoverage": 70.37,
+  "pass": true,
+  "platform": "Windows-10-10.0.26200-SP0",
+  "python": "3.11.15",
+  "recordedAt": "2026-08-14T04:03:05Z",
+  "repairBranchTests": 7,
+  "status": "passed",
+  "targetCoverage": 60.0,
+  "targetReached": true,
+  "testsFailed": 0,
+  "testsGenerated": 17,
+  "testsPassed": 17,
+  "uncoveredLines": [
+    {
+      "file": "auth.py",
+      "line": 14
+    },
+    {
+      "file": "legacy_payment.py",
+      "line": 20
+    },
+    {
+      "file": "legacy_payment.py",
+      "line": 22
+    },
+    {
+      "file": "legacy_payment.py",
+      "line": 25
+    },
+    {
+      "file": "legacy_payment.py",
+      "line": 27
+    },
+    {
+      "file": "legacy_payment.py",
+      "line": 31
+    },
+    {
+      "file": "legacy_payment.py",
+      "line": 32
+    },
+    {
+      "file": "legacy_payment.py",
+      "line": 33
+    },
+    {
+      "file": "legacy_payment.py",
+      "line": 36
+    },
+    {
+      "file": "legacy_payment.py",
+      "line": 37
+    },
+    {
+      "file": "legacy_payment.py",
+      "line": 43
+    },
+    {
+      "file": "legacy_payment.py",
+      "line": 44
+    },
+    {
+      "file": "legacy_payment.py",
+      "line": 45
+    },
+    {
+      "file": "legacy_payment.py",
+      "line": 46
+    },
+    {
+      "file": "legacy_payment.py",
+      "line": 47
+    },
+    {
+      "file": "main.py",
+      "line": 14
+    },
+    {
+      "file": "utils.py",
+      "line": 13
+    },
+    {
+      "file": "utils.py",
+      "line": 28
+    }
+  ]
+}
