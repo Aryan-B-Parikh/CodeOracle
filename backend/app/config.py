@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     upload_dir: Path = Path("./uploads")
     llm_api_key: str = ""
+    openrouter_api_key: str = ""
     llm_provider: str = "openai"
     llm_model: str = ""
     llm_base_url: str = "https://api.openai.com/v1"

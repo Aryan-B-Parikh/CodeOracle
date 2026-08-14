@@ -299,6 +299,95 @@ class OpenAIProvider:
         ) from last_exc
 
 
+class OpenRouterProvider(OpenAIProvider):
+    """OpenRouter API provider supporting Gemini, Claude, Llama, DeepSeek, and OpenAI models."""
+
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "google/gemini-2.0-flash-lite-001",
+        base_url: str = "https://openrouter.ai/api/v1",
+        retries: int = 3,
+        timeout_seconds: float = 60.0,
+        client: httpx.Client | None = None,
+    ) -> None:
+        super().__init__(
+            api_key=api_key,
+            model=model or "google/gemini-2.0-flash-lite-001",
+            base_url=base_url or "https://openrouter.ai/api/v1",
+            retries=retries,
+            timeout_seconds=timeout_seconds,
+            client=client,
+        )
+        self.provider_name = "openrouter"
+
+    def complete(
+        self,
+        prompt: str,
+        system: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float = 0.0,
+    ) -> LLMResponse:
+        url = f"{self.base_url}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://codeoracle.dev",
+            "X-Title": "CodeOracle",
+        }
+
+        messages: list[dict[str, str]] = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": temperature,
+        }
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
+
+        last_exc: Exception | None = None
+        client = self._get_client()
+
+        for attempt in range(self.retries + 1):
+            try:
+                response = client.post(url, headers=headers, json=payload)
+                if response.status_code == 401 or response.status_code == 403:
+                    raise LLMAuthenticationError(f"Authentication failed: {response.text}")
+                response.raise_for_status()
+
+                data = response.json()
+                choice = data["choices"][0]
+                content = choice["message"]["content"] or ""
+                usage = data.get("usage", {})
+
+                return LLMResponse(
+                    content=content,
+                    model=data.get("model", self.model),
+                    provider="openrouter",
+                    prompt_tokens=usage.get("prompt_tokens", self.count_tokens(prompt)),
+                    completion_tokens=usage.get("completion_tokens", self.count_tokens(content)),
+                    total_tokens=usage.get("total_tokens", 0),
+                    finish_reason=choice.get("finish_reason"),
+                    raw=data,
+                )
+            except (httpx.HTTPStatusError, httpx.RequestError, KeyError, ValueError) as exc:
+                last_exc = exc
+                if isinstance(exc, LLMAuthenticationError):
+                    raise
+                if attempt < self.retries:
+                    time.sleep(0.2 * (2**attempt))
+                else:
+                    logger.warning("OpenRouter API call failed after %d retries: %s", self.retries, exc)
+
+        raise LLMRetryableError(
+            f"OpenRouter completion request failed after {self.retries + 1} attempts: {last_exc}"
+        ) from last_exc
+
+
 class AnthropicProvider:
     """Anthropic Messages API client with retries and backoff."""
 
@@ -487,7 +576,32 @@ def get_llm_gateway(settings: Settings | None = None) -> LLMGateway:
 
     provider: LLMProvider
 
-    if provider_type == "openai":
+    openrouter_key = (
+        getattr(settings, "openrouter_api_key", "")
+        or (settings.llm_api_key if settings.llm_api_key.startswith("sk-or-") else "")
+    )
+
+    if provider_type == "openrouter" or (provider_type == "openai" and openrouter_key):
+        active_key = openrouter_key or settings.llm_api_key
+        if not active_key:
+            logger.warning(
+                "LLM_PROVIDER is 'openrouter' but no API key provided; falling back to MockLLMProvider"
+            )
+            provider = MockLLMProvider(model=model or "mock-openrouter")
+        else:
+            base_url = (
+                settings.llm_base_url
+                if "openrouter.ai" in settings.llm_base_url
+                else "https://openrouter.ai/api/v1"
+            )
+            provider = OpenRouterProvider(
+                api_key=active_key,
+                model=model or "google/gemini-2.0-flash-lite-001",
+                base_url=base_url,
+                retries=settings.llm_retries,
+                timeout_seconds=settings.llm_timeout_seconds,
+            )
+    elif provider_type == "openai":
         if not settings.llm_api_key:
             logger.warning(
                 "LLM_PROVIDER is 'openai' but LLM_API_KEY is empty; falling back to MockLLMProvider"
