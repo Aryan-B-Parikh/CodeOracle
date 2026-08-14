@@ -21,8 +21,10 @@ services:
         value: 256
       - key: LLM_PROVIDER
         value: openai
+      - key: LLM_BASE_URL
+        value: https://openrouter.ai/api/v1
       - key: LLM_MODEL
-        value: gpt-4o-mini
+        value: nvidia/nemotron-3-ultra-550b-a55b:free
       - key: LLM_API_KEY
         sync: false
 

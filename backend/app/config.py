@@ -20,8 +20,8 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     openrouter_api_key: str = ""
     llm_provider: str = "openai"
-    llm_model: str = ""
-    llm_base_url: str = "https://api.openai.com/v1"
+    llm_model: str = "nvidia/nemotron-3-ultra-550b-a55b:free"
+    llm_base_url: str = "https://openrouter.ai/api/v1"
     llm_max_tokens: int = 2048
     llm_token_budget: int = 8192
     llm_retries: int = 3

@@ -212,8 +212,8 @@ class OpenAIProvider:
     def __init__(
         self,
         api_key: str,
-        model: str = "gpt-4o-mini",
-        base_url: str = "https://api.openai.com/v1",
+        model: str = "nvidia/nemotron-3-ultra-550b-a55b:free",
+        base_url: str = "https://openrouter.ai/api/v1",
         retries: int = 3,
         timeout_seconds: float = 60.0,
         client: httpx.Client | None = None,
@@ -245,6 +245,8 @@ class OpenAIProvider:
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
+            "HTTP-Referer": "https://codeoracle.dev",
+            "X-Title": "CodeOracle",
         }
 
         messages: list[dict[str, str]] = []
@@ -300,12 +302,12 @@ class OpenAIProvider:
 
 
 class OpenRouterProvider(OpenAIProvider):
-    """OpenRouter API provider configured for NVIDIA Nemotron 70B and modern LLM reasoning."""
+    """OpenRouter API provider configured for NVIDIA Nemotron 550B ultra free model."""
 
     def __init__(
         self,
         api_key: str,
-        model: str = "nvidia/llama-3.1-nemotron-70b-instruct",
+        model: str = "nvidia/nemotron-3-ultra-550b-a55b:free",
         base_url: str = "https://openrouter.ai/api/v1",
         retries: int = 3,
         timeout_seconds: float = 60.0,
@@ -313,7 +315,7 @@ class OpenRouterProvider(OpenAIProvider):
     ) -> None:
         super().__init__(
             api_key=api_key,
-            model=model or "nvidia/llama-3.1-nemotron-70b-instruct",
+            model=model or "nvidia/nemotron-3-ultra-550b-a55b:free",
             base_url=base_url or "https://openrouter.ai/api/v1",
             retries=retries,
             timeout_seconds=timeout_seconds,
@@ -596,7 +598,7 @@ def get_llm_gateway(settings: Settings | None = None) -> LLMGateway:
             )
             provider = OpenRouterProvider(
                 api_key=active_key,
-                model=model or "nvidia/llama-3.1-nemotron-70b-instruct",
+                model=model or "nvidia/nemotron-3-ultra-550b-a55b:free",
                 base_url=base_url,
                 retries=settings.llm_retries,
                 timeout_seconds=settings.llm_timeout_seconds,
@@ -610,7 +612,7 @@ def get_llm_gateway(settings: Settings | None = None) -> LLMGateway:
         else:
             provider = OpenAIProvider(
                 api_key=settings.llm_api_key,
-                model=model or "gpt-4o-mini",
+                model=model or "nvidia/nemotron-3-ultra-550b-a55b:free",
                 base_url=settings.llm_base_url,
                 retries=settings.llm_retries,
                 timeout_seconds=settings.llm_timeout_seconds,
