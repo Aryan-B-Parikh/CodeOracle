@@ -71,6 +71,7 @@ def start_analysis(
             detail="analysis worker is unavailable; please retry",
         ) from exc
 
+    db.refresh(analysis)
     return AnalysisEnvelope(data=AnalysisOut.model_validate(analysis))
 
 
