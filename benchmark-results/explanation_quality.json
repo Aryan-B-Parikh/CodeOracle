@@ -1,0 +1,199 @@
+{
+  "accuracy": 5.0,
+  "benchmark": "explanation-quality-20-functions",
+  "clarity": 5.0,
+  "completeness": 5.0,
+  "functionsEvaluated": 20,
+  "judge": "deterministic-rubric-v1",
+  "judgeProvider": "mock",
+  "overall": 5.0,
+  "pass": true,
+  "perFunction": [
+    {
+      "accuracy": 5.0,
+      "clarity": 5.0,
+      "completeness": 5.0,
+      "entity": "process_transaction_1",
+      "evidenceCount": 6,
+      "file": "module_1.py",
+      "grounded": true
+    },
+    {
+      "accuracy": 5.0,
+      "clarity": 5.0,
+      "completeness": 5.0,
+      "entity": "process_transaction_10",
+      "evidenceCount": 6,
+      "file": "module_10.py",
+      "grounded": true
+    },
+    {
+      "accuracy": 5.0,
+      "clarity": 5.0,
+      "completeness": 5.0,
+      "entity": "process_transaction_11",
+      "evidenceCount": 6,
+      "file": "module_11.py",
+      "grounded": true
+    },
+    {
+      "accuracy": 5.0,
+      "clarity": 5.0,
+      "completeness": 5.0,
+      "entity": "process_transaction_12",
+      "evidenceCount": 6,
+      "file": "module_12.py",
+      "grounded": true
+    },
+    {
+      "accuracy": 5.0,
+      "clarity": 5.0,
+      "completeness": 5.0,
+      "entity": "process_transaction_13",
+      "evidenceCount": 6,
+      "file": "module_13.py",
+      "grounded": true
+    },
+    {
+      "accuracy": 5.0,
+      "clarity": 5.0,
+      "completeness": 5.0,
+      "entity": "process_transaction_14",
+      "evidenceCount": 6,
+      "file": "module_14.py",
+      "grounded": true
+    },
+    {
+      "accuracy": 5.0,
+      "clarity": 5.0,
+      "completeness": 5.0,
+      "entity": "process_transaction_15",
+      "evidenceCount": 6,
+      "file": "module_15.py",
+      "grounded": true
+    },
+    {
+      "accuracy": 5.0,
+      "clarity": 5.0,
+      "completeness": 5.0,
+      "entity": "process_transaction_16",
+      "evidenceCount": 6,
+      "file": "module_16.py",
+      "grounded": true
+    },
+    {
+      "accuracy": 5.0,
+      "clarity": 5.0,
+      "completeness": 5.0,
+      "entity": "process_transaction_17",
+      "evidenceCount": 6,
+      "file": "module_17.py",
+      "grounded": true
+    },
+    {
+      "accuracy": 5.0,
+      "clarity": 5.0,
+      "completeness": 5.0,
+      "entity": "process_transaction_18",
+      "evidenceCount": 6,
+      "file": "module_18.py",
+      "grounded": true
+    },
+    {
+      "accuracy": 5.0,
+      "clarity": 5.0,
+      "completeness": 5.0,
+      "entity": "process_transaction_19",
+      "evidenceCount": 6,
+      "file": "module_19.py",
+      "grounded": true
+    },
+    {
+      "accuracy": 5.0,
+      "clarity": 5.0,
+      "completeness": 5.0,
+      "entity": "process_transaction_2",
+      "evidenceCount": 6,
+      "file": "module_2.py",
+      "grounded": true
+    },
+    {
+      "accuracy": 5.0,
+      "clarity": 5.0,
+      "completeness": 5.0,
+      "entity": "process_transaction_20",
+      "evidenceCount": 6,
+      "file": "module_20.py",
+      "grounded": true
+    },
+    {
+      "accuracy": 5.0,
+      "clarity": 5.0,
+      "completeness": 5.0,
+      "entity": "process_transaction_3",
+      "evidenceCount": 6,
+      "file": "module_3.py",
+      "grounded": true
+    },
+    {
+      "accuracy": 5.0,
+      "clarity": 5.0,
+      "completeness": 5.0,
+      "entity": "process_transaction_4",
+      "evidenceCount": 6,
+      "file": "module_4.py",
+      "grounded": true
+    },
+    {
+      "accuracy": 5.0,
+      "clarity": 5.0,
+      "completeness": 5.0,
+      "entity": "process_transaction_5",
+      "evidenceCount": 6,
+      "file": "module_5.py",
+      "grounded": true
+    },
+    {
+      "accuracy": 5.0,
+      "clarity": 5.0,
+      "completeness": 5.0,
+      "entity": "process_transaction_6",
+      "evidenceCount": 6,
+      "file": "module_6.py",
+      "grounded": true
+    },
+    {
+      "accuracy": 5.0,
+      "clarity": 5.0,
+      "completeness": 5.0,
+      "entity": "process_transaction_7",
+      "evidenceCount": 6,
+      "file": "module_7.py",
+      "grounded": true
+    },
+    {
+      "accuracy": 5.0,
+      "clarity": 5.0,
+      "completeness": 5.0,
+      "entity": "process_transaction_8",
+      "evidenceCount": 6,
+      "file": "module_8.py",
+      "grounded": true
+    },
+    {
+      "accuracy": 5.0,
+      "clarity": 5.0,
+      "completeness": 5.0,
+      "entity": "process_transaction_9",
+      "evidenceCount": 6,
+      "file": "module_9.py",
+      "grounded": true
+    }
+  ],
+  "platform": "Windows-10-10.0.26200-SP0",
+  "python": "3.11.15",
+  "recordedAt": "2026-08-14T03:43:50Z",
+  "target": {
+    "overallMin": 4.0
+  }
+}

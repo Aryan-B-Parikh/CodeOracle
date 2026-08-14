@@ -1,0 +1,20 @@
+{
+  "benchmark": "10k-loc-scalability",
+  "entities": 825,
+  "files": 75,
+  "graphEdges": 4725,
+  "limits": {
+    "locMax": 10500,
+    "locMin": 10000,
+    "wallTimeMsMax": 300000
+  },
+  "pass": true,
+  "peakMemoryMb": 23.73,
+  "platform": "Windows-10-10.0.26200-SP0",
+  "python": "3.11.15",
+  "recordedAt": "2026-08-14T03:45:05Z",
+  "scannedLoc": 10275,
+  "uploadMs": 215.21,
+  "vectors": 900,
+  "wallTimeMs": 14370.76
+}

@@ -5,22 +5,34 @@ Evaluates CodeOracle explanations across 20 known legacy functions against:
   - Accuracy (verifiable evidence lines, AST signature fidelity)
   - Completeness (business rules, error handling, dependencies)
 
-Asserts that overall score >= 4.0 / 5.0.
+Scoring is produced by a DETERMINISTIC rubric (judge = "deterministic-rubric-v1")
+that evaluates the structured explanation fields and the post-generation
+evidence validator (app/services/explanation.py::validate_evidence_items).
+There is no opaque external judge: every 1-5 component score is computed from
+checkable data, and the full per-function breakdown is recorded to
+benchmark-results/explanation_quality.json so any score is auditable and
+bit-for-bit reproducible in CI (mock provider) or against any real provider.
+
+Asserts that overall score >= 4.0 / 5.0 and that every cited evidence item is
+grounded in a real repository file within valid line bounds.
 """
 
 from __future__ import annotations
 
 import io
+import json
 import uuid
 import zipfile
 from pathlib import Path
 
 from app.db.models.entity import Entity
+from app.db.models.file import File
 from app.db.models.repository import Repository
 from app.db.session import SessionLocal
 from app.services.analysis import analyze_repository
 from app.services.explanation import explain_entity
 from fastapi.testclient import TestClient
+from tests.benchmark_report import write_artifact
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
@@ -70,6 +82,11 @@ def test_explanation_quality_benchmark(client: TestClient) -> None:
         clarity_scores: list[float] = []
         accuracy_scores: list[float] = []
         completeness_scores: list[float] = []
+        per_function: list[dict] = []
+
+        repo_file_paths = {
+            f.path for f in db.query(File).filter(File.repository_id == repo_id).all()
+        }
 
         for entity in entities[:20]:
             explanation_data = explain_entity(db, repository, entity)
@@ -81,11 +98,13 @@ def test_explanation_quality_benchmark(client: TestClient) -> None:
             clarity_scores.append(clarity)
 
             # 2. Accuracy Evaluation: evidence grounded with valid file + line bounds
-            evidence_valid = all(
-                ev.file == explanation_data.entity.file and ev.line_start >= entity.line_start
-                for ev in explanation_data.evidence
-            ) if explanation_data.evidence else True
-            accuracy = 5.0 if evidence_valid else 2.0
+            evidence = explanation_data.evidence
+            grounded = all(
+                ev.file in repo_file_paths
+                and entity.line_start <= ev.line_start <= ev.line_end <= entity.line_end
+                for ev in evidence
+            ) if evidence else False
+            accuracy = 5.0 if grounded else 2.0
             accuracy_scores.append(accuracy)
 
             # 3. Completeness Evaluation: inputs, outputs, error handling detailed
@@ -94,6 +113,28 @@ def test_explanation_quality_benchmark(client: TestClient) -> None:
             has_errors = bool(explanation_data.explanation.error_handling)
             completeness = 5.0 if (has_inputs and has_outputs and has_errors) else 3.0
             completeness_scores.append(completeness)
+
+            # Deterministic grounding: the evidence validator must have kept at
+            # least one citation for every explained function.
+            assert evidence, (
+                f"Explanation for {entity.name} has no evidence after validation"
+            )
+            assert grounded, (
+                f"Explanation for {entity.name} cites out-of-bounds or unknown files: "
+                f"{[(ev.file, ev.line_start, ev.line_end) for ev in evidence]}"
+            )
+
+            per_function.append(
+                {
+                    "entity": entity.name,
+                    "file": entity.file.path if entity.file else None,
+                    "evidenceCount": len(evidence),
+                    "grounded": grounded,
+                    "clarity": clarity,
+                    "accuracy": accuracy,
+                    "completeness": completeness,
+                }
+            )
 
         avg_clarity = round(sum(clarity_scores) / len(clarity_scores), 2)
         avg_accuracy = round(sum(accuracy_scores) / len(accuracy_scores), 2)
@@ -108,5 +149,30 @@ def test_explanation_quality_benchmark(client: TestClient) -> None:
             f"Completeness: {avg_completeness}/5.0 | Overall: {overall_score}/5.0 (Target >= 4.0)"
         )
 
+        # Record the auditable per-function scoring artifact (also uploaded from CI).
+        artifact = write_artifact(
+            "explanation_quality",
+            {
+                "benchmark": "explanation-quality-20-functions",
+                "judge": "deterministic-rubric-v1",
+                "judgeProvider": explanation_data.provider,
+                "clarity": avg_clarity,
+                "accuracy": avg_accuracy,
+                "completeness": avg_completeness,
+                "overall": overall_score,
+                "target": {"overallMin": 4.0},
+                "functionsEvaluated": len(per_function),
+                "perFunction": per_function,
+                "pass": True,
+            },
+        )
+        print(f"Artifact={artifact}")
+
         # Requirement 8 Assertion
         assert overall_score >= 4.0, f"Explanation quality below 4.0/5.0: {overall_score}"
+        assert overall_score <= 5.0, f"Invalid score above 5.0: {overall_score}"
+        with artifact.open(encoding="utf-8") as fh:
+            recorded = json.load(fh)
+        assert (
+            recorded["overall"] == overall_score
+        ), "Recorded artifact diverges from measured score"

@@ -5,13 +5,17 @@ the end-to-end processing pipeline:
   Scan -> AST Facts -> Graph -> Semantic Index -> Architectural Summary
 
 Asserts that wall-clock processing time is under 300 seconds (5 minutes) and
-logs wall-clock time, peak memory, entity count, graph edges, and embedding count.
+RECORDS a benchmark artifact (benchmark-results/scalability.json) with the
+measured evidence: actual scanned LOC, file count, entity count, graph edges,
+vector count, upload time, wall time, and peak Python memory (tracemalloc) —
+so the result is auditable per run, not just a pass/fail print.
 """
 
 from __future__ import annotations
 
 import io
 import time
+import tracemalloc
 import uuid
 import zipfile
 
@@ -22,6 +26,7 @@ from app.db.models.repository import Repository
 from app.db.session import SessionLocal
 from app.services.analysis import analyze_repository
 from fastapi.testclient import TestClient
+from tests.benchmark_report import write_artifact
 
 
 def _generate_10k_loc_zip() -> bytes:
@@ -85,7 +90,15 @@ def test_10k_loc_scalability_benchmark(client: TestClient) -> None:
         assert repository is not None
 
         # Execute full analysis pipeline (Scan -> AST Facts -> Graph -> Index -> Summary)
-        analyze_repository(db, repository)
+        # under tracemalloc to record the peak Python allocation during analysis.
+        tracemalloc.start()
+        try:
+            analyze_repository(db, repository)
+        finally:
+            _, peak_bytes = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+        peak_memory_mb = round(peak_bytes / (1024 * 1024), 2)
+
         tot_loc = repository.loc
 
         file_count = db.query(File).filter(File.repository_id == repo_id).count()
@@ -99,20 +112,33 @@ def test_10k_loc_scalability_benchmark(client: TestClient) -> None:
 
     wall_time_ms = round((time.time() - t0) * 1000, 2)
 
-    try:
-        import psutil
-        peak_memory_mb = round(psutil.Process().memory_info().rss / (1024 * 1024), 2)
-    except Exception:
-        peak_memory_mb = 0.0
-
     # Strict Requirement 3 Assertions
     assert 10_000 <= tot_loc <= 10_500, f"Expected 10,000-10,500 LOC, measured {tot_loc}"
     assert file_count >= 60, f"Expected >=60 files, measured {file_count}"
     assert entity_count >= 500, f"Expected >=500 entities, measured {entity_count}"
     assert wall_time_ms < 300_000.0, f"Exceeded 5 min budget: {wall_time_ms}ms"
 
+    # Record the auditable benchmark artifact (also uploaded from CI).
+    artifact = write_artifact(
+        "scalability",
+        {
+            "benchmark": "10k-loc-scalability",
+            "scannedLoc": tot_loc,
+            "files": file_count,
+            "entities": entity_count,
+            "graphEdges": call_edges_count,
+            "vectors": vector_count,
+            "uploadMs": upload_ms,
+            "wallTimeMs": wall_time_ms,
+            "peakMemoryMb": peak_memory_mb,
+            "limits": {"locMin": 10_000, "locMax": 10_500, "wallTimeMsMax": 300_000},
+            "pass": True,
+        },
+    )
+
     print(
         f"\n[10K LOC BENCHMARK TELEMETRY] LOC={tot_loc:,} | Files={file_count} | "
         f"Entities={entity_count} | GraphEdges={call_edges_count} | Vectors={vector_count} | "
-        f"UploadMs={upload_ms}ms | WallTimeMs={wall_time_ms}ms | PeakMemMB={peak_memory_mb}MB"
+        f"UploadMs={upload_ms}ms | WallTimeMs={wall_time_ms}ms | "
+        f"PeakMemMB={peak_memory_mb}MB | Artifact={artifact}"
     )

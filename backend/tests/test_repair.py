@@ -84,15 +84,32 @@ def test_coverage_repair_loop_service() -> None:
 def test_unbroken_golden_chain_coverage_repair(client: TestClient) -> None:
     """Requirement 2: Unbroken Golden-Chain System Test.
 
-    Uploads legacy demo repository, calls generate_unit_tests() for baseline,
-    then executes generate_uncovered_tests() to repair uncovered lines.
+    Exercises the production automatic-repair path end-to-end (no benchmark
+    shortcut — benchmark/legacy_demo/python/run_benchmark.py is NOT used here):
+
+      1. POST /api/v1/repositories/upload        -> app/api/routes/repositories.py
+         (zip ingest -> app/services/ingestion.py)
+      2. analyze_repository()                    -> app/services/analysis.py
+         (AST facts -> graph -> semantic index -> summary)
+      3. generate_unit_tests()                   -> app/services/test_generator.py
+         (baseline: AST-fact-driven test generation)
+      4. generate_uncovered_tests()              -> app/services/test_generator.py
+         (automatic coverage-repair loop)
+         a. reads uncovered lines from the latest coverage run
+         b. appends `test_<func>_repair_branch()` tests
+         c. executes them in the Docker sandbox     -> app/services/sandbox_runner.py
+            (staged repo + pytest + coverage.py inside the container image)
+         d. repeats until line coverage >= target (60.0) or max_iterations (3)
 
     The chain runs against the mock LLM provider (enforced in conftest), so
     the AST-fact fallback generators carry the whole pipeline — the golden
     chain must hold without any LLM.
 
     When Docker is available: strictly asserts the chain ran end-to-end and
-    reached the 60% line-coverage acceptance floor.
+    reached the 60% line-coverage acceptance floor — and that the REPAIR LOOP
+    actually executed (iteration >= 2 plus repair-branch tests present in the
+    final suite), proving the coverage was earned by repair, not a baseline
+    short-circuit.
     When Docker is unavailable: asserts fail-closed behavior (status == "failed").
     """
     repo_id_str = _upload_and_analyze(client, "python_legacy")
@@ -117,6 +134,21 @@ def test_unbroken_golden_chain_coverage_repair(client: TestClient) -> None:
         from app.services.sandbox_runner import is_docker_sandbox_ready
 
         if is_docker_sandbox_ready():
+            assert final_run.iteration >= 2, (
+                "Golden-chain: automatic repair loop did not run — iteration must be >= 2 "
+                "(baseline iteration 1 + at least one repair iteration), got "
+                f"iteration={final_run.iteration}"
+            )
+            repair_tests = [
+                line
+                for line in (final_run.test_code or "").splitlines()
+                if "def test_" in line and "repair_branch" in line
+            ]
+            assert repair_tests, (
+                "Golden-chain: no repair-branch tests found in the final suite — the "
+                "coverage was NOT produced by the automatic repair loop; "
+                f"iteration={final_run.iteration}, status={final_run.status}"
+            )
             assert final_run.tests_generated > 0, (
                 "Golden-chain: no tests were generated — repair loop did not run; "
                 f"status={final_run.status}, iteration={final_run.iteration}, "

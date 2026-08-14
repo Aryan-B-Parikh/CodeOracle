@@ -49,6 +49,13 @@ jobs:
         run: pytest backend/tests/test_pgvector.py -q
       - name: Coverage benchmark (demo repo, real pytest + coverage.py)
         run: python benchmark/legacy_demo/python/run_benchmark.py
+      - name: Upload benchmark artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark-results/
+          if-no-files-found: warn
 
   sandbox:
     name: Docker sandbox integration
