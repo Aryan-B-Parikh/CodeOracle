@@ -2499,7 +2499,7 @@
   ],
   "platform": "Windows-11-10.0.26200-SP0",
   "python": "3.14.5",
-  "recordedAt": "2026-08-14T04:38:35Z",
+  "recordedAt": "2026-08-14T05:03:33Z",
   "target": {
     "groundingPctMin": 100.0,
     "overallMin": 4.0

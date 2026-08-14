@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ipaddress
-import os
 import shutil
 import socket
 import subprocess
@@ -32,10 +31,6 @@ def validate_git_url(url: str) -> str:
 
     parsed = urlsplit(cleaned)
 
-    # Allow local file:// scheme strictly during deterministic test runs
-    if parsed.scheme == "file" and os.environ.get("CODEORACLE_ALLOW_LOCAL_GIT") == "1":
-        return cleaned
-
     if parsed.scheme not in ("http", "https"):
         detail_msg = (
             f"Unsupported Git protocol '{parsed.scheme}'. Only https:// (or http://) is allowed."
@@ -54,29 +49,46 @@ def validate_git_url(url: str) -> str:
 
     try:
         ip = ipaddress.ip_address(hostname)
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_unspecified:
+        if (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_unspecified
+            or ip.is_multicast
+            or ip.is_reserved
+        ):
             raise HTTPException(
                 status_code=422,
-                detail="Private and loopback Git IP addresses are not permitted",
+                detail="Private, reserved, or loopback Git IP addresses are not permitted",
             )
     except ValueError:
-        # Host is a domain name — resolve DNS to prevent SSRF to private IPs
-        if os.environ.get("CODEORACLE_SKIP_DNS_CHECK") != "1":
-            try:
-                addr_info = socket.getaddrinfo(hostname, None, proto=socket.IPPROTO_TCP)
-                for _, _, _, _, sockaddr in addr_info:
-                    resolved_ip = ipaddress.ip_address(sockaddr[0])
-                    if (
-                        resolved_ip.is_private
-                        or resolved_ip.is_loopback
-                        or resolved_ip.is_link_local
-                    ):
-                        raise HTTPException(
-                            status_code=422,
-                            detail=f"Host '{hostname}' resolves to private/internal IP address",
-                        )
-            except (socket.gaierror, OSError):
-                pass
+        # Resolve DNS and fail closed if resolution fails or resolves to internal IPs
+        try:
+            addr_info = socket.getaddrinfo(hostname, None, proto=socket.IPPROTO_TCP)
+            if not addr_info:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"DNS resolution returned no address records for '{hostname}'",
+                )
+            for _, _, _, _, sockaddr in addr_info:
+                resolved_ip = ipaddress.ip_address(sockaddr[0])
+                if (
+                    resolved_ip.is_private
+                    or resolved_ip.is_loopback
+                    or resolved_ip.is_link_local
+                    or resolved_ip.is_unspecified
+                    or resolved_ip.is_multicast
+                    or resolved_ip.is_reserved
+                ):
+                    msg = (
+                        f"Host '{hostname}' resolves to restricted IP address ({resolved_ip})"
+                    )
+                    raise HTTPException(status_code=422, detail=msg)
+        except socket.gaierror as err:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Failed to resolve host '{hostname}': DNS lookup failed",
+            ) from err
 
     return cleaned
 

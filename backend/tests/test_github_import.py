@@ -55,14 +55,21 @@ def _create_local_git_repo(tmp_path: Path) -> Path:
 def test_github_repository_import_e2e(
     client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Test POST /api/v1/repositories/import with local git repository."""
-    monkeypatch.setenv("CODEORACLE_ALLOW_LOCAL_GIT", "1")
+    """Test POST /api/v1/repositories/import with mocked public git repository."""
+    import app.services.ingestion as ingestion
+
     git_repo_path = _create_local_git_repo(tmp_path)
-    git_url = git_repo_path.as_uri()
+    public_git_url = "https://github.com/example/python-basic.git"
+
+    def fake_clone(url: str, dest: Path, timeout: int = 300) -> None:
+        shutil.copytree(git_repo_path, dest, dirs_exist_ok=True)
+
+    import shutil
+    monkeypatch.setattr(ingestion, "clone_repository", fake_clone)
 
     response = client.post(
         "/api/v1/repositories/import",
-        json={"github_url": git_url},
+        json={"github_url": public_git_url},
     )
     assert response.status_code == 201, response.text
 
@@ -71,7 +78,7 @@ def test_github_repository_import_e2e(
     repo_data = payload["data"]
 
     assert repo_data["sourceType"] == "github"
-    assert repo_data["githubUrl"] == git_url
+    assert repo_data["githubUrl"] == public_git_url
     repo_id = uuid.UUID(repo_data["id"])
 
     with SessionLocal() as db:

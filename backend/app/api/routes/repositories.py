@@ -1,5 +1,6 @@
 """Repository ingestion API: upload a ZIP or import from GitHub."""
 
+import logging
 import shutil
 import uuid
 from pathlib import Path
@@ -20,6 +21,7 @@ from app.schemas.repository import (
 )
 from app.services.ingestion import ingest_git, ingest_zip, validate_git_url
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 settings = get_settings()
 
@@ -195,6 +197,19 @@ def delete_repository(
     db.commit()
 
     workdir = settings.upload_dir / str(repository_id)
-    shutil.rmtree(workdir, ignore_errors=True)
+    fs_cleaned = True
+    if workdir.exists():
+        try:
+            shutil.rmtree(workdir)
+        except Exception as exc:
+            fs_cleaned = False
+            logger.error("Failed to delete repository directory %s: %s", workdir, exc)
 
-    return {"data": {"deleted": True, "id": str(repository_id)}, "error": None}
+    return {
+        "data": {
+            "deleted": True,
+            "id": str(repository_id),
+            "fs_cleaned": fs_cleaned,
+        },
+        "error": None,
+    }
