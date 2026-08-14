@@ -178,10 +178,12 @@ def _aggregate(
     db.commit()
     db.expire_all()
     stats = store_parse_results(db, repository, results)
-    repository.status = "analyzed"
     set_stage(db, analysis, "aggregating", STAGE_DONE)
     set_stage(db, analysis, "graph", STAGE_DONE)
-    analysis.status = "completed"
+    # Keep the analysis in `running` until semantic indexing completes. The UI
+    # uses analysisStatus/currentStage to decide when it is safe to stop polling.
+    repository.status = "analyzing"
+    analysis.status = "running"
     db.commit()
     _index(db, repository, analysis)
     db.refresh(repository)
@@ -205,6 +207,7 @@ def _index(db: Session, repository: Repository, analysis: Analysis) -> None:
         _fail(repository.id, analysis.id, "index")
         return
     set_stage(db, analysis, "index", STAGE_DONE, chunks=chunks)
+    repository.status = "analyzed"
     analysis.status = "completed"
     db.commit()
 
