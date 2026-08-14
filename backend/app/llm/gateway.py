@@ -300,12 +300,12 @@ class OpenAIProvider:
 
 
 class OpenRouterProvider(OpenAIProvider):
-    """OpenRouter API provider supporting Gemini, Claude, Llama, DeepSeek, and OpenAI models."""
+    """OpenRouter API provider configured for NVIDIA Nemotron 70B and modern LLM reasoning."""
 
     def __init__(
         self,
         api_key: str,
-        model: str = "google/gemini-2.0-flash-lite-001",
+        model: str = "nvidia/llama-3.1-nemotron-70b-instruct",
         base_url: str = "https://openrouter.ai/api/v1",
         retries: int = 3,
         timeout_seconds: float = 60.0,
@@ -313,7 +313,7 @@ class OpenRouterProvider(OpenAIProvider):
     ) -> None:
         super().__init__(
             api_key=api_key,
-            model=model or "google/gemini-2.0-flash-lite-001",
+            model=model or "nvidia/llama-3.1-nemotron-70b-instruct",
             base_url=base_url or "https://openrouter.ai/api/v1",
             retries=retries,
             timeout_seconds=timeout_seconds,
@@ -596,7 +596,7 @@ def get_llm_gateway(settings: Settings | None = None) -> LLMGateway:
             )
             provider = OpenRouterProvider(
                 api_key=active_key,
-                model=model or "google/gemini-2.0-flash-lite-001",
+                model=model or "nvidia/llama-3.1-nemotron-70b-instruct",
                 base_url=base_url,
                 retries=settings.llm_retries,
                 timeout_seconds=settings.llm_timeout_seconds,
