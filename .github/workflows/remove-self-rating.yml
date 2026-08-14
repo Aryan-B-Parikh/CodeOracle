@@ -1,0 +1,32 @@
+name: Remove product self-rating
+
+on:
+  push:
+    paths:
+      - '.github/workflows/remove-self-rating.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove self-rating label
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('frontend/src/App.tsx')
+          text = path.read_text()
+          old = "            <span style={styles.versionBadge}>10/10 Modernization</span>\n"
+          if old not in text:
+              raise SystemExit('Self-rating label not found; refusing to modify unrelated UI')
+          path.write_text(text.replace(old, '', 1))
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add frontend/src/App.tsx
+          git rm .github/workflows/remove-self-rating.yml
+          git commit -m 'fix(ui): remove self-rating from CodeOracle header'
+          git push
