@@ -311,7 +311,6 @@ export function App() {
           <div style={styles.brandRow}>
             <span style={styles.brandLogo}>⚡</span>
             <span style={styles.logoText}>CodeOracle</span>
-            <span style={styles.versionBadge}>10/10 Modernization</span>
           </div>
           <div style={styles.repoPickerContainer}>
             <select
