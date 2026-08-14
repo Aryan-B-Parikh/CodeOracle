@@ -4,6 +4,15 @@ import { SafetyScoreEnvelope } from '../types/safety'
 
 const API_BASE = '/api/v1'
 
+// Latest-request-wins guards prevent slow responses from an older user action
+// from overwriting the result of a newer action. Requests are allowed to finish
+// normally; stale callers simply receive the newest request's result instead.
+let latestEntityExplanationRequest: Promise<ExplanationEnvelope> | null = null
+let latestEntityImpactRequest: Promise<ImpactEnvelope> | null = null
+let latestEntitySourceRequest: Promise<{ file: string; lineStart: number; lineEnd: number; code: string }> | null = null
+let latestRepositoryGraphRequest: Promise<GraphEnvelope> | null = null
+let latestRepositoryEntitiesRequest: Promise<EntityItem[]> | null = null
+
 export interface RepositorySummary {
   id: string
   name: string
@@ -200,54 +209,84 @@ export async function deleteRepository(repositoryId: string): Promise<void> {
 }
 
 export async function fetchRepositoryEntities(repositoryId: string): Promise<EntityItem[]> {
-  const res = await fetch(`${API_BASE}/repositories/${repositoryId}/entities`)
-  if (!res.ok) {
-    throw new Error(`Failed to list entities: status ${res.status}`)
-  }
-  const envelope = await res.json()
-  return (envelope.data || []) as EntityItem[]
+  const request = (async () => {
+    const res = await fetch(`${API_BASE}/repositories/${repositoryId}/entities`)
+    if (!res.ok) {
+      throw new Error(`Failed to list entities: status ${res.status}`)
+    }
+    const envelope = await res.json()
+    return (envelope.data || []) as EntityItem[]
+  })()
+
+  latestRepositoryEntitiesRequest = request
+  const result = await request
+  return request === latestRepositoryEntitiesRequest ? result : latestRepositoryEntitiesRequest!
 }
 
 export async function fetchEntityExplanation(
   repositoryId: string,
   entityId: string
 ): Promise<ExplanationEnvelope> {
-  const res = await fetch(`${API_BASE}/repositories/${repositoryId}/entities/${entityId}/explanation`)
-  if (!res.ok) {
-    throw new Error(`Failed to fetch explanation: status ${res.status}`)
-  }
-  return res.json()
+  const request = (async () => {
+    const res = await fetch(`${API_BASE}/repositories/${repositoryId}/entities/${entityId}/explanation`)
+    if (!res.ok) {
+      throw new Error(`Failed to fetch explanation: status ${res.status}`)
+    }
+    return res.json() as Promise<ExplanationEnvelope>
+  })()
+
+  latestEntityExplanationRequest = request
+  const result = await request
+  return request === latestEntityExplanationRequest ? result : latestEntityExplanationRequest!
 }
 
 export async function fetchEntityImpact(
   repositoryId: string,
   entityId: string
 ): Promise<ImpactEnvelope> {
-  const res = await fetch(`${API_BASE}/repositories/${repositoryId}/entities/${entityId}/impact`)
-  if (!res.ok) {
-    throw new Error(`Failed to fetch impact: status ${res.status}`)
-  }
-  return res.json()
+  const request = (async () => {
+    const res = await fetch(`${API_BASE}/repositories/${repositoryId}/entities/${entityId}/impact`)
+    if (!res.ok) {
+      throw new Error(`Failed to fetch impact: status ${res.status}`)
+    }
+    return res.json() as Promise<ImpactEnvelope>
+  })()
+
+  latestEntityImpactRequest = request
+  const result = await request
+  return request === latestEntityImpactRequest ? result : latestEntityImpactRequest!
 }
 
 export async function fetchEntitySource(
   repositoryId: string,
   entityId: string
 ): Promise<{ file: string; lineStart: number; lineEnd: number; code: string }> {
-  const res = await fetch(`${API_BASE}/repositories/${repositoryId}/entities/${entityId}/source`)
-  if (!res.ok) {
-    throw new Error(`Failed to fetch source: status ${res.status}`)
-  }
-  const envelope = await res.json()
-  return envelope.data
+  const request = (async () => {
+    const res = await fetch(`${API_BASE}/repositories/${repositoryId}/entities/${entityId}/source`)
+    if (!res.ok) {
+      throw new Error(`Failed to fetch source: status ${res.status}`)
+    }
+    const envelope = await res.json()
+    return envelope.data as { file: string; lineStart: number; lineEnd: number; code: string }
+  })()
+
+  latestEntitySourceRequest = request
+  const result = await request
+  return request === latestEntitySourceRequest ? result : latestEntitySourceRequest!
 }
 
 export async function fetchRepositoryGraph(repositoryId: string): Promise<GraphEnvelope> {
-  const res = await fetch(`${API_BASE}/repositories/${repositoryId}/graph`)
-  if (!res.ok) {
-    throw new Error(`Failed to fetch graph: status ${res.status}`)
-  }
-  return res.json()
+  const request = (async () => {
+    const res = await fetch(`${API_BASE}/repositories/${repositoryId}/graph`)
+    if (!res.ok) {
+      throw new Error(`Failed to fetch graph: status ${res.status}`)
+    }
+    return res.json() as Promise<GraphEnvelope>
+  })()
+
+  latestRepositoryGraphRequest = request
+  const result = await request
+  return request === latestRepositoryGraphRequest ? result : latestRepositoryGraphRequest!
 }
 
 export async function fetchLatestTestRun(repositoryId: string): Promise<TestRunEnvelope> {
