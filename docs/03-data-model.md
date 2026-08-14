@@ -166,21 +166,26 @@ Indexes: `repository_id`, `file_id`, `entity_id`.
 ## API contract (v1) — routes
 
 - `POST /api/v1/repositories/upload` — multipart ZIP → repository id, begins scan.
-- `POST /api/v1/repositories/import` — body `{ "github_url": "..." }`.
+- `POST /api/v1/repositories/import` — body `{ "github_url": "..." }` with DNS-resolved SSRF protection.
+- `GET /api/v1/repositories` — list recent repositories.
 - `GET /api/v1/repositories/{id}` — metadata + status.
+- `DELETE /api/v1/repositories/{id}` — cascades deletion across all tables and deletes disk upload folder.
 - `POST /api/v1/repositories/{id}/analyze` — creates an `analyses` row (`queued`) and enqueues the Celery pipeline; 409 while an analysis is already `queued`/`running`.
 - `GET /api/v1/repositories/{id}/status` — live pipeline state: `{ repositoryStatus, analysisStatus, currentStage, pipelineState }`; `pipelineState` stages `uploaded`/`scanned`/`parsing`/`aggregating`/`graph` each with `state` (`pending`/`running`/`done`/`error`), parsing also `filesTotal`/`filesParsed`; `currentStage` = first non-done stage or `completed`.
-- `GET /api/v1/repositories/{id}/graph` — nodes/edges for React Flow (`{ nodes: [{id, label, type, complexity, file, lineStart, lineEnd, qualifiedName, riskScore}], edges: [{source, target, kind}] }`); edge `kind` is `contains` \| `call` \| `imports` \| `inherits` \| `implements`; `meta` holds `circularDependencies: [{cycle}]` (module-level) and `highRiskNodeIds` (top 10 by `complexity × (callers + callees + 1)`).
+- `GET /api/v1/repositories/{id}/graph` — nodes/edges for interactive graph visualizer (`{ nodes: [{id, label, type, complexity, file, lineStart, lineEnd, qualifiedName, riskScore}], edges: [{source, target, kind}] }`); edge `kind` is `contains` \| `call` \| `imports` \| `inherits` \| `implements`; `meta` holds `circularDependencies: [{cycle}]` (module-level) and `highRiskNodeIds` (top 10 by `complexity × (callers + callees + 1)`).
 - `GET /api/v1/repositories/{id}/summary` — repository overview, architecture classification (Presentation → Business Logic → Data Access), architectural issues (circular deps, global state, coupling), and high-risk entities.
 - `GET /api/v1/repositories/{id}/modules/summary` — per-module entity summaries.
+- `GET /api/v1/repositories/{id}/entities` — lists all discovered entities with types, complexity, signatures, and files.
 - `GET /api/v1/repositories/{id}/entities/{entityId}` — entity metadata + AST facts.
-- `GET /api/v1/repositories/{id}/entities/{entityId}/explanation` — structured LLM explanation with `evidence[]` (`{ claim, file, lineStart, lineEnd, code }`).
-- `GET /api/v1/repositories/{id}/entities/{entityId}/impact` — callers + impact level.
+- `GET /api/v1/repositories/{id}/entities/{entityId}/source` — returns exact raw source lines for code viewer.
+- `GET /api/v1/repositories/{id}/entities/{entityId}/explanation` — structured 10-field LLM explanation with `evidence[]` (`{ claim, file, lineStart, lineEnd, code }`).
+- `GET /api/v1/repositories/{id}/entities/{entityId}/impact` — callers + callees and impact level.
 - `POST /api/v1/repositories/{id}/tests/generate` — starts test generation job.
 - `GET /api/v1/repositories/{id}/tests/latest` — coverage summary + uncovered lines.
-- `POST /api/v1/repositories/{id}/tests/generate-uncovered` — targeted iteration.
+- `POST /api/v1/repositories/{id}/tests/generate-uncovered` — targeted repair iteration.
 - `POST /api/v1/repositories/{id}/refactors/{entityId}/propose` — LLM + static diff → proposal.
 - `GET /api/v1/repositories/{id}/refactors` — list proposals + safety scores.
+- `GET /api/v1/repositories/{id}/refactors/{proposalId}/safety` — 4-pillar safety score breakdown.
 - `GET /api/v1/repositories/{id}/search?q=...` — semantic search; ranked `results` (`{ query, results: [{entityId, qualifiedName, file, type, level, lineStart, lineEnd, score}] }`).
 
 Shared envelope: `{ "data": ..., "error": null }`; errors: `{ "data": null, "error": { "code": "...", "message": "..." } }`.

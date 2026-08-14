@@ -196,6 +196,17 @@ Full re-audit of tasks T-01..T-17 (commit `7a5bcf9`) found 22 findings across 17
 - **Frontend Integration:** Added `SafetyScoreCard` React component rendering 0-100 gauge, risk badges, sub-score bars, breaking changes list with `file:line` callers, and safety recommendations.
 - **Verified:** 115 Python backend tests passed (`pytest backend/tests`), 13 Vitest frontend tests passed (`npm run test`), and clean production build (`npm run build`).
 
+## 2026-08-14 — Security Hardening, Cascade Deletion, Product Shell & Interactive Workspaces
+
+- **Git URL & DNS SSRF Hardening (`ingestion.py`):** Blocked `file://`, `ssh://`, `git@`, `localhost`, `127.0.0.1`, `::1`, and private/internal IP networks. Added DNS resolution validation via `socket.getaddrinfo()` to verify destination hostnames do not resolve to private IP addresses (preventing DNS-rebinding attacks). Added security unit tests in `test_github_import.py`.
+- **Repository Deletion & DB/Disk Cascade (`repositories.py`):** Added `DELETE /api/v1/repositories/{id}` endpoint performing ordered cascade deletion across all relational tables (`analyses`, `test_runs`, `test_cases`, `refactor_proposals`, `chunks`, `calls`, `entities`, `files`) and removing physical `./uploads/{id}` folders from disk. Added `test_delete_repository_cascade_cleanup` in `test_repositories.py`.
+- **Interactive Grounded Explanation Workspace (`ExplanationTab.tsx`):** Added searchable discovered entities drawer, 10-field structured explanation cards (purpose, business rules, inputs, outputs, control flow, dependencies, errors, side effects, complexity, risks), static evidence citation pills (`L{start}–L{end}` with code snippets), Blast Radius & Fan-in/Fan-out impact table, raw source code viewer, and direct transition to Refactor.
+- **Interactive Dependency Graph Visualizer (`DependencyGraphTab.tsx`):** Built interactive SVG canvas graph with pan & zoom controls, reset view, node/edge risk filters (Call, Import, Contains, High Risk, Circular), circular dependency cycle banners, and inspection drawer with direct action links.
+- **Refactor & Safety Modernization Workspace (`RefactorTab.tsx`):** Added searchable entity dropdown (replacing manual UUID entry), prominent Behavioral Equivalence status banner (`BEHAVIOR_PRESERVED` / `BEHAVIOR_MUTATED` / `BEHAVIOR_UNVERIFIED`), breaking changes table, and 4-pillar safety score breakdown.
+- **Modern Shell & Design System (`App.tsx` + `index.css`):** Built unified 5-workspace layout (`Overview`, `Explanations`, `Dependency Graph`, `Generated Tests`, `Refactor & Safety`), 750ms live pipeline status polling, GitHub URL import modal, and global CSS design system with Inter & JetBrains Mono typography and focus indicators.
+- **Documentation & Stack Alignment:** Corrected `README.md`, `CLAUDE.md`, and `docs/03-data-model.md` to match the implemented architecture.
+- **Verified:** 144 passed backend tests (`pytest backend/tests`), 19 passed frontend tests (`npm run test`), and 94.3% real pytest-cov coverage benchmark.
+
 ## Template for new entries
 
 ```
@@ -205,4 +216,5 @@ Full re-audit of tasks T-01..T-17 (commit `7a5bcf9`) found 22 findings across 17
 - **Replaces:** <option/decision superseded, if any>
 - **Notes:** <consequences, follow-ups>
 ```
+
 

@@ -8,7 +8,7 @@ Single source of truth for AI coding tools working on this repo. Read this first
 
 ## Stack (do not swap without an ADR — see docs/06)
 
-- **Frontend:** React + Vite + TypeScript + Tailwind, Monaco, React Flow, Recharts, TanStack Query
+- **Frontend:** React 18 + Vite + TypeScript, Custom Canvas/SVG Graph Engine, Unified Diff Viewer, Responsive Design System
 - **Backend:** Python 3.11+, FastAPI, Celery + Redis, SQLAlchemy 2.x + Alembic
 - **Analysis:** Python `ast` + tree-sitter (incl. `tree-sitter-java` for Java), NetworkX, Radon
 - **Storage:** PostgreSQL 15 + pgvector (HNSW)
