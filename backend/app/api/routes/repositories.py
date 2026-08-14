@@ -1,6 +1,5 @@
 """Repository ingestion API: upload a ZIP or import from GitHub."""
 
-import contextlib
 import shutil
 import uuid
 from pathlib import Path
