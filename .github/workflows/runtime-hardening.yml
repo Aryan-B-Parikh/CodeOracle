@@ -1,0 +1,184 @@
+name: Runtime hardening
+
+on:
+  push:
+    paths:
+      - '.github/workflows/runtime-hardening.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ github.event.head_commit.message != 'chore: apply runtime race hardening' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch async race guards
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          exp = Path('frontend/src/components/ExplanationTab.tsx')
+          text = exp.read_text()
+          text = text.replace(
+              "import React, { useState, useEffect } from 'react'",
+              "import React, { useState, useEffect, useRef } from 'react'",
+              1,
+          )
+          text = text.replace(
+              "  const [activeCitationIndex, setActiveCitationIndex] = useState<number | null>(null)\n",
+              "  const [activeCitationIndex, setActiveCitationIndex] = useState<number | null>(null)\n  const entityRequestIdRef = useRef(0)\n  const detailRequestIdRef = useRef(0)\n",
+              1,
+          )
+          old = '''  useEffect(() => {\n    if (!repositoryId) {\n      setEntities([])\n      setSelectedEntityId(null)\n      setExplanation(null)\n      setImpact(null)\n      setSourceData(null)\n      return\n    }\n\n    setLoadingEntities(true)\n    fetchRepositoryEntities(repositoryId)\n      .then((items) => {\n        setEntities(items)\n        if (items.length > 0 && !selectedEntityId) {\n          setSelectedEntityId(items[0].id)\n        }\n      })\n      .catch((err) => {\n        setError(`Failed to load entities: ${err.message}`)\n      })\n      .finally(() => setLoadingEntities(false))\n  }, [repositoryId])\n'''
+          new = '''  useEffect(() => {\n    const requestId = ++entityRequestIdRef.current\n\n    if (!repositoryId) {\n      setEntities([])\n      setSelectedEntityId(null)\n      setExplanation(null)\n      setImpact(null)\n      setSourceData(null)\n      setLoadingEntities(false)\n      return () => {\n        entityRequestIdRef.current += 1\n      }\n    }\n\n    setEntities([])\n    setSelectedEntityId(null)\n    setLoadingEntities(true)\n    fetchRepositoryEntities(repositoryId)\n      .then((items) => {\n        if (requestId !== entityRequestIdRef.current) return\n        setEntities(items)\n        if (items.length > 0) {\n          setSelectedEntityId(items[0].id)\n        }\n      })\n      .catch((err) => {\n        if (requestId !== entityRequestIdRef.current) return\n        setError(`Failed to load entities: ${err.message}`)\n      })\n      .finally(() => {\n        if (requestId === entityRequestIdRef.current) setLoadingEntities(false)\n      })\n\n    return () => {\n      entityRequestIdRef.current += 1\n    }\n  }, [repositoryId])\n'''
+          if old not in text:
+              raise SystemExit('Explanation entity effect pattern not found')
+          text = text.replace(old, new, 1)
+
+          old = '''  useEffect(() => {\n    if (!repositoryId || !selectedEntityId) {\n      setExplanation(null)\n      setImpact(null)\n      setSourceData(null)\n      return\n    }\n\n    setLoadingExplanation(true)\n    setError(null)\n    setActiveCitationIndex(null)\n\n    Promise.all([\n      fetchEntityExplanation(repositoryId, selectedEntityId).catch(() => null),\n      fetchEntityImpact(repositoryId, selectedEntityId).catch(() => null),\n      fetchEntitySource(repositoryId, selectedEntityId).catch(() => null),\n    ])\n      .then(([expEnv, impEnv, srcData]) => {\n        if (expEnv?.data) setExplanation(expEnv.data)\n        if (impEnv?.data) setImpact(impEnv.data)\n        if (srcData) setSourceData(srcData)\n      })\n      .catch((err) => setError(`Failed to load entity details: ${err.message}`))\n      .finally(() => setLoadingExplanation(false))\n  }, [repositoryId, selectedEntityId])\n'''
+          new = '''  useEffect(() => {\n    const requestId = ++detailRequestIdRef.current\n\n    setExplanation(null)\n    setImpact(null)\n    setSourceData(null)\n    setActiveCitationIndex(null)\n\n    if (!repositoryId || !selectedEntityId) {\n      setLoadingExplanation(false)\n      return () => {\n        detailRequestIdRef.current += 1\n      }\n    }\n\n    setLoadingExplanation(true)\n    setError(null)\n\n    Promise.all([\n      fetchEntityExplanation(repositoryId, selectedEntityId).catch(() => null),\n      fetchEntityImpact(repositoryId, selectedEntityId).catch(() => null),\n      fetchEntitySource(repositoryId, selectedEntityId).catch(() => null),\n    ])\n      .then(([expEnv, impEnv, srcData]) => {\n        if (requestId !== detailRequestIdRef.current) return\n        setExplanation(expEnv?.data || null)\n        setImpact(impEnv?.data || null)\n        setSourceData(srcData || null)\n      })\n      .catch((err) => {\n        if (requestId === detailRequestIdRef.current) {\n          setError(`Failed to load entity details: ${err.message}`)\n        }\n      })\n      .finally(() => {\n        if (requestId === detailRequestIdRef.current) setLoadingExplanation(false)\n      })\n\n    return () => {\n      detailRequestIdRef.current += 1\n    }\n  }, [repositoryId, selectedEntityId])\n'''
+          if old not in text:
+              raise SystemExit('Explanation detail effect pattern not found')
+          text = text.replace(old, new, 1)
+          exp.write_text(text)
+
+          graph = Path('frontend/src/components/DependencyGraphTab.tsx')
+          text = graph.read_text()
+          text = text.replace(
+              "  const svgRef = useRef<SVGSVGElement>(null)\n",
+              "  const svgRef = useRef<SVGSVGElement>(null)\n  const graphRequestIdRef = useRef(0)\n",
+              1,
+          )
+          old = '''  useEffect(() => {\n    if (!repositoryId) {\n      setGraphData(null)\n      setSelectedNodeId(null)\n      return\n    }\n\n    setLoading(true)\n    setError(null)\n    fetchRepositoryGraph(repositoryId)\n      .then((envelope) => {\n        setGraphData(envelope.data)\n        if (envelope.data.nodes.length > 0 && !selectedNodeId) {\n          setSelectedNodeId(envelope.data.nodes[0].id)\n        }\n      })\n      .catch((err) => {\n        setError(`Failed to load dependency graph: ${err.message}`)\n      })\n      .finally(() => setLoading(false))\n  }, [repositoryId])\n'''
+          new = '''  useEffect(() => {\n    const requestId = ++graphRequestIdRef.current\n\n    setGraphData(null)\n    setSelectedNodeId(null)\n\n    if (!repositoryId) {\n      setLoading(false)\n      setError(null)\n      return () => {\n        graphRequestIdRef.current += 1\n      }\n    }\n\n    setLoading(true)\n    setError(null)\n    fetchRepositoryGraph(repositoryId)\n      .then((envelope) => {\n        if (requestId !== graphRequestIdRef.current) return\n        setGraphData(envelope.data)\n        setSelectedNodeId(envelope.data.nodes.length > 0 ? envelope.data.nodes[0].id : null)\n      })\n      .catch((err) => {\n        if (requestId !== graphRequestIdRef.current) return\n        setError(`Failed to load dependency graph: ${err.message}`)\n      })\n      .finally(() => {\n        if (requestId === graphRequestIdRef.current) setLoading(false)\n      })\n\n    return () => {\n      graphRequestIdRef.current += 1\n    }\n  }, [repositoryId])\n'''
+          if old not in text:
+              raise SystemExit('Graph effect pattern not found')
+          text = text.replace(old, new, 1)
+          graph.write_text(text)
+          PY
+
+      - name: Add race regression tests
+        run: |
+          cat > frontend/src/components/runtime-race.test.tsx <<'EOF'
+          import React from 'react'
+          import { act } from 'react'
+          import { createRoot, Root } from 'react-dom/client'
+          import { afterEach, describe, expect, it, vi } from 'vitest'
+          import { ExplanationTab } from './ExplanationTab'
+          import { DependencyGraphTab } from './DependencyGraphTab'
+          import type { EntityItem, ExplanationEnvelope, ImpactEnvelope, GraphEnvelope } from '../services/api'
+
+          vi.mock('../services/api', async () => {
+            const actual = await vi.importActual<typeof import('../services/api')>('../services/api')
+            return {
+              ...actual,
+              fetchRepositoryEntities: vi.fn(),
+              fetchEntityExplanation: vi.fn(),
+              fetchEntityImpact: vi.fn(),
+              fetchEntitySource: vi.fn(),
+              fetchRepositoryGraph: vi.fn(),
+            }
+          })
+
+          import * as api from '../services/api'
+
+          const entity = (id: string, name: string): EntityItem => ({
+            id, name, type: 'function', file: `${name}.py`, lineStart: 1, lineEnd: 3,
+            complexity: 1, language: 'Python', signature: `def ${name}():`, isPublic: true,
+          })
+
+          const explanation = (name: string): ExplanationEnvelope => ({
+            data: {
+              entity: { name, type: 'function', file: `${name}.py`, lineStart: 1, lineEnd: 3 },
+              explanation: {
+                purpose: `Purpose ${name}`, inputs: '', outputs: '', sideEffects: '', dependencies: '',
+                controlFlow: '', errorHandling: '', businessRules: '', complexity: 1, risks: '',
+              }, evidence: [], provider: 'test',
+            }, error: null,
+          })
+
+          const impact: ImpactEnvelope = { data: {
+            entity: { name: 'test', file: 'test.py', lineStart: 1, lineEnd: 3 },
+            callers: [], callees: [], impact: 'low', impactReason: 'test',
+          }, error: null }
+
+          const graph = (id: string): GraphEnvelope => ({
+            data: { nodes: [{ id, label: id, type: 'function', complexity: 1 }], edges: [], meta: { circularDependencies: [], highRiskNodeIds: [] } },
+            error: null,
+          })
+
+          let root: Root | null = null
+          let host: HTMLDivElement | null = null
+
+          afterEach(() => {
+            root?.unmount()
+            root = null
+            host?.remove()
+            host = null
+            vi.clearAllMocks()
+          })
+
+          function render(node: React.ReactNode) {
+            host = document.createElement('div')
+            document.body.appendChild(host)
+            root = createRoot(host)
+            act(() => root!.render(node))
+          }
+
+          describe('runtime race guards', () => {
+            it('keeps the newest ExplanationTab entity when an older request resolves last', async () => {
+              const entities = [entity('a', 'alpha'), entity('b', 'beta')]
+              vi.mocked(api.fetchRepositoryEntities).mockResolvedValue(entities)
+              const expA = Promise.withResolvers<ExplanationEnvelope>()
+              const expB = Promise.withResolvers<ExplanationEnvelope>()
+              vi.mocked(api.fetchEntityExplanation).mockImplementation((_r, id) => id === 'a' ? expA.promise : expB.promise)
+              vi.mocked(api.fetchEntityImpact).mockResolvedValue(impact)
+              vi.mocked(api.fetchEntitySource).mockResolvedValue({ file: 'test.py', lineStart: 1, lineEnd: 1, code: 'pass' })
+
+              render(<ExplanationTab repositoryId="repo" />)
+              await act(async () => {})
+              const buttons = Array.from(host!.querySelectorAll('[data-testid^="entity-item-"]')) as HTMLButtonElement[]
+              expect(buttons).toHaveLength(2)
+              await act(async () => { buttons[1].click() })
+              await act(async () => { expB.resolve(explanation('beta')); expA.resolve(explanation('alpha')); await Promise.all([expA.promise, expB.promise]) })
+
+              expect(host!.textContent).toContain('beta')
+              expect(host!.textContent).toContain('Purpose beta')
+              expect(host!.textContent).not.toContain('Purpose alpha')
+            })
+
+            it('keeps the newest dependency graph when an older repository request resolves last', async () => {
+              const graphA = Promise.withResolvers<GraphEnvelope>()
+              const graphB = Promise.withResolvers<GraphEnvelope>()
+              vi.mocked(api.fetchRepositoryGraph).mockImplementation((_id) => _id === 'repo-a' ? graphA.promise : graphB.promise)
+
+              render(<DependencyGraphTab repositoryId="repo-a" />)
+              render(<DependencyGraphTab repositoryId="repo-b" />)
+              await act(async () => { graphB.resolve(graph('B')); graphA.resolve(graph('A')); await Promise.all([graphA.promise, graphB.promise]) })
+
+              expect(host!.textContent).toContain('B')
+              expect(host!.textContent).not.toContain('A')
+            })
+          })
+          EOF
+
+      - name: Typecheck and run focused runtime tests
+        run: |
+          cd frontend
+          npm ci
+          npx tsc --noEmit
+          npx vitest run src/components/runtime-race.test.tsx
+
+      - name: Commit runtime hardening
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add frontend/src/components/ExplanationTab.tsx frontend/src/components/DependencyGraphTab.tsx frontend/src/components/runtime-race.test.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m 'chore: apply runtime race hardening'
+          git push
