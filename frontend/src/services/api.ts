@@ -2,7 +2,8 @@ import { TestRunEnvelope } from '../types/test_run'
 import { RefactorProposalEnvelope } from '../types/refactor'
 import { SafetyScoreEnvelope } from '../types/safety'
 
-const API_BASE = '/api/v1'
+const API_PREFIX = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '')
+const API_BASE = `${API_PREFIX}/api/v1`
 
 // Latest-request-wins guards prevent slow responses from an older user action
 // from overwriting the result of a newer action. Requests are allowed to finish
