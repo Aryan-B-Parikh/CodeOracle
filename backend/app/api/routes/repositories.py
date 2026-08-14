@@ -162,6 +162,8 @@ def delete_repository(
     from app.db.models.chunk import Chunk
     from app.db.models.entity import Entity
     from app.db.models.file import File as FileModel
+    from app.db.models.import_ import Import
+    from app.db.models.inheritance import Inheritance
     from app.db.models.refactor_proposal import RefactorProposalRecord
     from app.db.models.test_case import TestCase
     from app.db.models.test_run import TestRun
@@ -187,6 +189,12 @@ def delete_repository(
     db.query(Call).filter(Call.repository_id == repository_id).delete(
         synchronize_session=False
     )
+    db.query(Inheritance).filter(Inheritance.repository_id == repository_id).delete(
+        synchronize_session=False
+    )
+    db.query(Import).join(FileModel).filter(
+        FileModel.repository_id == repository_id
+    ).delete(synchronize_session=False)
     db.query(Entity).filter(Entity.repository_id == repository_id).delete(
         synchronize_session=False
     )
