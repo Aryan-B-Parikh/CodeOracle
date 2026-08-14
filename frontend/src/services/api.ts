@@ -163,9 +163,7 @@ export async function importRepository(githubUrl: string): Promise<RepositorySum
     throw new Error(errorBody?.detail || `Import failed: status ${res.status}`)
   }
   const envelope = await res.json()
-  const repository = envelope.data as RepositorySummary
-  await triggerAnalysis(repository.id)
-  return repository
+  return envelope.data as RepositorySummary
 }
 
 export async function triggerAnalysis(repositoryId: string): Promise<void> {
@@ -189,9 +187,7 @@ export async function uploadRepository(file: File): Promise<RepositorySummary> {
     throw new Error(errorBody?.detail || `Upload failed: status ${res.status}`)
   }
   const envelope = await res.json()
-  const repository = envelope.data as RepositorySummary
-  await triggerAnalysis(repository.id)
-  return repository
+  return envelope.data as RepositorySummary
 }
 
 export async function deleteRepository(repositoryId: string): Promise<void> {
