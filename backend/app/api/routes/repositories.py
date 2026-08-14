@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -192,9 +193,10 @@ def delete_repository(
     db.query(Inheritance).filter(Inheritance.repository_id == repository_id).delete(
         synchronize_session=False
     )
-    db.query(Import).join(FileModel).filter(
-        FileModel.repository_id == repository_id
-    ).delete(synchronize_session=False)
+    file_ids = select(FileModel.id).where(FileModel.repository_id == repository_id)
+    db.query(Import).filter(Import.file_id.in_(file_ids)).delete(
+        synchronize_session=False
+    )
     db.query(Entity).filter(Entity.repository_id == repository_id).delete(
         synchronize_session=False
     )
