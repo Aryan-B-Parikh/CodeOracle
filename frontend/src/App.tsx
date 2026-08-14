@@ -5,6 +5,7 @@ import { DashboardTab, RepositorySummaryData } from './components/DashboardTab'
 import { PipelineStatusCard, RepositoryStatusData } from './components/PipelineStatusCard'
 import { ExplanationTab } from './components/ExplanationTab'
 import { DependencyGraphTab } from './components/DependencyGraphTab'
+import { SystemDocsTab } from './components/SystemDocsTab'
 import { TestRunData } from './types/test_run'
 import { RefactorProposal } from './types/refactor'
 import { SafetyScoreData } from './types/safety'
@@ -23,7 +24,7 @@ import {
   triggerAnalysis,
 } from './services/api'
 
-export type TabKey = 'overview' | 'explanations' | 'graph' | 'tests' | 'refactor'
+export type TabKey = 'overview' | 'explanations' | 'graph' | 'tests' | 'refactor' | 'docs'
 
 export interface TabConfig {
   key: TabKey
@@ -38,6 +39,7 @@ const TABS: TabConfig[] = [
   { key: 'graph', label: 'Dependency Graph', icon: '🕸' },
   { key: 'tests', label: 'Generated Tests Lab', icon: '🧪' },
   { key: 'refactor', label: 'Refactor & Safety', icon: '⚡' },
+  { key: 'docs', label: 'System Manual & Guide', icon: '📚' },
 ]
 
 const POLL_INTERVAL_MS = 750
@@ -531,6 +533,12 @@ export function App() {
               initialEntityId={selectedEntityForRefactor}
               onPropose={repositoryId ? handleProposeRefactor : undefined}
             />
+          </div>
+        )}
+
+        {activeTab === 'docs' && (
+          <div style={styles.tabContentContainer}>
+            <SystemDocsTab onNavigateTab={(tab) => setActiveTab(tab)} />
           </div>
         )}
       </main>
