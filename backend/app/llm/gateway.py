@@ -224,6 +224,7 @@ class OpenAIProvider:
         self.retries = retries
         self.timeout_seconds = timeout_seconds
         self._external_client = client
+        self.provider_name = "openai"
 
     def count_tokens(self, text: str) -> int:
         return estimate_tokens(text, model=self.model)
@@ -316,6 +317,7 @@ class AnthropicProvider:
         self.retries = retries
         self.timeout_seconds = timeout_seconds
         self._external_client = client
+        self.provider_name = "anthropic"
 
     def count_tokens(self, text: str) -> int:
         return estimate_tokens(text, model=self.model)
