@@ -2497,9 +2497,9 @@
       }
     }
   ],
-  "platform": "Windows-10-10.0.26200-SP0",
-  "python": "3.11.15",
-  "recordedAt": "2026-08-14T04:22:52Z",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.14.5",
+  "recordedAt": "2026-08-14T04:38:35Z",
   "target": {
     "groundingPctMin": 100.0,
     "overallMin": 4.0

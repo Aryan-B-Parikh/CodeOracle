@@ -12,11 +12,136 @@ export interface RepositorySummary {
   githubUrl?: string | null
   loc: number
   entityCount: number
+  fileCount?: number
   languages: Record<string, boolean>
+  warnings?: string[]
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface RepositoryListEnvelope {
   data: RepositorySummary[]
+}
+
+export interface EntityItem {
+  id: string
+  name: string
+  type: string
+  file: string
+  lineStart: number
+  lineEnd: number
+  signature?: string | null
+  language?: string
+  complexity: number
+  isPublic?: boolean
+  docstring?: string | null
+}
+
+export interface EvidenceCitation {
+  claim: string
+  file: string
+  lineStart: number
+  lineEnd: number
+  code: string
+}
+
+export interface ExplanationFields {
+  purpose: string
+  inputs: string
+  outputs: string
+  sideEffects: string
+  dependencies: string
+  controlFlow: string
+  errorHandling: string
+  businessRules: string
+  complexity: number
+  risks: string
+}
+
+export interface ExplanationData {
+  entity: {
+    id?: string
+    name: string
+    type: string
+    file: string
+    lineStart: number
+    lineEnd: number
+  }
+  explanation: ExplanationFields
+  evidence: EvidenceCitation[]
+  provider?: string | null
+}
+
+export interface ExplanationEnvelope {
+  data: ExplanationData | null
+  error?: { code: string; message: string } | null
+}
+
+export interface CallerItem {
+  caller: string
+  file: string
+  lineStart: number
+  lineEnd: number
+  callLine: number
+}
+
+export interface CalleeItem {
+  callee: string
+  file: string
+  lineStart: number
+  lineEnd: number
+}
+
+export interface ImpactData {
+  entity: {
+    name: string
+    file: string
+    lineStart: number
+    lineEnd: number
+  }
+  callers: CallerItem[]
+  callees: CalleeItem[]
+  impact: 'high' | 'medium' | 'low' | string
+  impactReason: string
+}
+
+export interface ImpactEnvelope {
+  data: ImpactData | null
+  error?: { code: string; message: string } | null
+}
+
+export interface GraphNode {
+  id: string
+  label: string
+  type: string
+  complexity: number
+  file?: string | null
+  lineStart?: number | null
+  lineEnd?: number | null
+  qualifiedName?: string | null
+  riskScore?: number | null
+}
+
+export interface GraphEdge {
+  source: string
+  target: string
+  kind: 'call' | 'import' | 'contains' | string
+}
+
+export interface GraphMeta {
+  circularDependencies: { cycle: string[] }[]
+  highRiskNodeIds: string[]
+}
+
+export interface GraphPayload {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+  meta: GraphMeta
+}
+
+export interface GraphEnvelope {
+  data: GraphPayload
+  error?: { code: string; message: string } | null
 }
 
 export async function fetchRepositories(): Promise<RepositoryListEnvelope> {
@@ -34,7 +159,8 @@ export async function importRepository(githubUrl: string): Promise<RepositorySum
     body: JSON.stringify({ github_url: githubUrl }),
   })
   if (!res.ok) {
-    throw new Error(`Import failed: status ${res.status}`)
+    const errorBody = await res.json().catch(() => null)
+    throw new Error(errorBody?.detail || `Import failed: status ${res.status}`)
   }
   const envelope = await res.json()
   return envelope.data as RepositorySummary
@@ -57,10 +183,71 @@ export async function uploadRepository(file: File): Promise<RepositorySummary> {
     body: form,
   })
   if (!res.ok) {
-    throw new Error(`Upload failed: status ${res.status}`)
+    const errorBody = await res.json().catch(() => null)
+    throw new Error(errorBody?.detail || `Upload failed: status ${res.status}`)
   }
   const envelope = await res.json()
   return envelope.data as RepositorySummary
+}
+
+export async function deleteRepository(repositoryId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/repositories/${repositoryId}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) {
+    throw new Error(`Failed to delete repository: status ${res.status}`)
+  }
+}
+
+export async function fetchRepositoryEntities(repositoryId: string): Promise<EntityItem[]> {
+  const res = await fetch(`${API_BASE}/repositories/${repositoryId}/entities`)
+  if (!res.ok) {
+    throw new Error(`Failed to list entities: status ${res.status}`)
+  }
+  const envelope = await res.json()
+  return (envelope.data || []) as EntityItem[]
+}
+
+export async function fetchEntityExplanation(
+  repositoryId: string,
+  entityId: string
+): Promise<ExplanationEnvelope> {
+  const res = await fetch(`${API_BASE}/repositories/${repositoryId}/entities/${entityId}/explanation`)
+  if (!res.ok) {
+    throw new Error(`Failed to fetch explanation: status ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function fetchEntityImpact(
+  repositoryId: string,
+  entityId: string
+): Promise<ImpactEnvelope> {
+  const res = await fetch(`${API_BASE}/repositories/${repositoryId}/entities/${entityId}/impact`)
+  if (!res.ok) {
+    throw new Error(`Failed to fetch impact: status ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function fetchEntitySource(
+  repositoryId: string,
+  entityId: string
+): Promise<{ file: string; lineStart: number; lineEnd: number; code: string }> {
+  const res = await fetch(`${API_BASE}/repositories/${repositoryId}/entities/${entityId}/source`)
+  if (!res.ok) {
+    throw new Error(`Failed to fetch source: status ${res.status}`)
+  }
+  const envelope = await res.json()
+  return envelope.data
+}
+
+export async function fetchRepositoryGraph(repositoryId: string): Promise<GraphEnvelope> {
+  const res = await fetch(`${API_BASE}/repositories/${repositoryId}/graph`)
+  if (!res.ok) {
+    throw new Error(`Failed to fetch graph: status ${res.status}`)
+  }
+  return res.json()
 }
 
 export async function fetchLatestTestRun(repositoryId: string): Promise<TestRunEnvelope> {
@@ -148,6 +335,3 @@ export async function downloadExecutiveReport(repositoryId: string, repositoryNa
   a.remove()
   window.URL.revokeObjectURL(url)
 }
-
-
-

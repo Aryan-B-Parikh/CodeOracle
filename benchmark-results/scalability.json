@@ -9,12 +9,12 @@
     "wallTimeMsMax": 300000
   },
   "pass": true,
-  "peakMemoryMb": 25.59,
-  "platform": "Windows-10-10.0.26200-SP0",
-  "python": "3.11.15",
-  "recordedAt": "2026-08-14T04:24:05Z",
+  "peakMemoryMb": 27.36,
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.14.5",
+  "recordedAt": "2026-08-14T04:39:32Z",
   "scannedLoc": 10275,
-  "uploadMs": 92.36,
+  "uploadMs": 73.99,
   "vectors": 900,
-  "wallTimeMs": 15275.61
+  "wallTimeMs": 8096.86
 }

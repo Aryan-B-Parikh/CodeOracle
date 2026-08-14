@@ -52,8 +52,11 @@ def _create_local_git_repo(tmp_path: Path) -> Path:
     return repo_dir
 
 
-def test_github_repository_import_e2e(client: TestClient, tmp_path: Path) -> None:
+def test_github_repository_import_e2e(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test POST /api/v1/repositories/import with local git repository."""
+    monkeypatch.setenv("CODEORACLE_ALLOW_LOCAL_GIT", "1")
     git_repo_path = _create_local_git_repo(tmp_path)
     git_url = git_repo_path.as_uri()
 
@@ -90,3 +93,31 @@ def test_github_repository_import_e2e(client: TestClient, tmp_path: Path) -> Non
         assert call_count >= 1
         assert chunk_count >= 1
         assert "python" in repo.languages
+
+
+def test_github_import_security_rejections(client: TestClient) -> None:
+    """Verify security rejection of unauthorized schemes and local addresses."""
+    # 1. file:// without testing override
+    res = client.post("/api/v1/repositories/import", json={"github_url": "file:///etc/passwd"})
+    assert res.status_code == 422
+
+    # 2. ssh:// scheme
+    res = client.post("/api/v1/repositories/import", json={"github_url": "ssh://git@internal-server/repo.git"})
+    assert res.status_code == 422
+
+    # 3. git@ scp syntax
+    res = client.post("/api/v1/repositories/import", json={"github_url": "git@github.com:owner/repo.git"})
+    assert res.status_code == 422
+
+    # 4. localhost SSRF attempt
+    res = client.post("/api/v1/repositories/import", json={"github_url": "http://localhost:8080/repo.git"})
+    assert res.status_code == 422
+
+    # 5. loopback IP SSRF attempt
+    res = client.post("/api/v1/repositories/import", json={"github_url": "https://127.0.0.1/repo.git"})
+    assert res.status_code == 422
+
+    # 6. private network IP SSRF attempt
+    res = client.post("/api/v1/repositories/import", json={"github_url": "https://192.168.1.1/repo.git"})
+    assert res.status_code == 422
+

@@ -1,5 +1,6 @@
 """Repository ingestion API: upload a ZIP or import from GitHub."""
 
+import contextlib
 import shutil
 import uuid
 from pathlib import Path
@@ -74,6 +75,7 @@ async def upload_repository(
     except HTTPException:
         shutil.rmtree(workdir, ignore_errors=True)
         raise
+
     return RepositoryEnvelope(data=RepositoryOut.model_validate(stored))
 
 
@@ -92,6 +94,7 @@ def import_repository(
 
     workdir = _repository_workdir(repository.id)
     stored = ingest_git(db, repository, url, workdir)
+
     return RepositoryEnvelope(data=RepositoryOut.model_validate(stored))
 
 
@@ -142,3 +145,57 @@ def get_repository(
     if latest_analysis and latest_analysis.summary:
         out.analysis = latest_analysis.summary
     return RepositoryEnvelope(data=out)
+
+
+@router.delete("/repositories/{repository_id}", response_model=dict)
+def delete_repository(
+    repository_id: uuid.UUID,
+    db: DbSession,
+) -> dict:
+    """Cascade delete a repository and all related records and uploaded files."""
+    repository = db.get(Repository, repository_id)
+    if repository is None:
+        raise HTTPException(status_code=404, detail="repository not found")
+
+    from app.db.models.call import Call
+    from app.db.models.chunk import Chunk
+    from app.db.models.entity import Entity
+    from app.db.models.file import File as FileModel
+    from app.db.models.refactor_proposal import RefactorProposalRecord
+    from app.db.models.test_case import TestCase
+    from app.db.models.test_run import TestRun
+
+    test_runs = db.query(TestRun).filter(TestRun.repository_id == repository_id).all()
+    test_run_ids = [tr.id for tr in test_runs]
+    if test_run_ids:
+        db.query(TestCase).filter(TestCase.test_run_id.in_(test_run_ids)).delete(
+            synchronize_session=False
+        )
+    db.query(TestRun).filter(TestRun.repository_id == repository_id).delete(
+        synchronize_session=False
+    )
+    db.query(RefactorProposalRecord).filter(
+        RefactorProposalRecord.repository_id == repository_id
+    ).delete(synchronize_session=False)
+    db.query(Analysis).filter(Analysis.repository_id == repository_id).delete(
+        synchronize_session=False
+    )
+    db.query(Chunk).filter(Chunk.repository_id == repository_id).delete(
+        synchronize_session=False
+    )
+    db.query(Call).filter(Call.repository_id == repository_id).delete(
+        synchronize_session=False
+    )
+    db.query(Entity).filter(Entity.repository_id == repository_id).delete(
+        synchronize_session=False
+    )
+    db.query(FileModel).filter(FileModel.repository_id == repository_id).delete(
+        synchronize_session=False
+    )
+    db.delete(repository)
+    db.commit()
+
+    workdir = settings.upload_dir / str(repository_id)
+    shutil.rmtree(workdir, ignore_errors=True)
+
+    return {"data": {"deleted": True, "id": str(repository_id)}, "error": None}

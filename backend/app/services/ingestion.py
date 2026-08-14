@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ipaddress
+import os
 import shutil
 import subprocess
 import zipfile
@@ -19,16 +21,48 @@ MAX_EXTRACT_BYTES = 200 * 1024 * 1024
 MAX_EXTRACT_FILES = 20_000
 GIT_CLONE_TIMEOUT = 300
 
-ALLOWED_GIT_SCHEMES = {"http", "https", "ssh", "file"}
+BLOCKED_HOSTNAMES = {"localhost", "127.0.0.1", "0.0.0.0", "::1", "local", "internal"}
 
 
 def validate_git_url(url: str) -> str:
-    parsed = urlsplit(url.strip())
-    if parsed.scheme in ALLOWED_GIT_SCHEMES:
-        return url.strip()
-    if parsed.scheme == "" and url.strip().startswith("git@"):
-        return url.strip()
-    raise HTTPException(status_code=422, detail=f"unsupported git url: {url}")
+    cleaned = url.strip()
+    if not cleaned:
+        raise HTTPException(status_code=422, detail="Git URL cannot be empty")
+
+    parsed = urlsplit(cleaned)
+
+    # Allow local file:// scheme strictly during deterministic test runs
+    if parsed.scheme == "file" and os.environ.get("CODEORACLE_ALLOW_LOCAL_GIT") == "1":
+        return cleaned
+
+    if parsed.scheme not in ("http", "https"):
+        detail_msg = (
+            f"Unsupported Git protocol '{parsed.scheme}'. Only https:// (or http://) is allowed."
+        )
+        raise HTTPException(status_code=422, detail=detail_msg)
+
+    hostname = (parsed.hostname or "").lower().strip()
+    is_blocked_host = (
+        not hostname
+        or hostname in BLOCKED_HOSTNAMES
+        or hostname.endswith(".local")
+        or hostname.endswith(".internal")
+    )
+    if is_blocked_host:
+        raise HTTPException(status_code=422, detail=f"Invalid or restricted Git host: {hostname}")
+
+    try:
+        ip = ipaddress.ip_address(hostname)
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_unspecified:
+            raise HTTPException(
+                status_code=422,
+                detail="Private and loopback Git IP addresses are not permitted",
+            )
+    except ValueError:
+        # Host is a valid domain name
+        pass
+
+    return cleaned
 
 
 def extract_zip(zip_path: Path, dest: Path) -> None:

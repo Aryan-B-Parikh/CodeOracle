@@ -250,6 +250,9 @@ def store_parse_results(
 
 def analyze_repository(db: Session, repository: Repository) -> dict[str, object]:
     """Sequential analysis (single process) using the same primitives as the pipeline."""
+    delete_analysis_facts(db, repository.id)
+    db.commit()
+    db.expire_all()
     root = repository_root(repository)
     results: list[tuple[str, ParsedFile]] = []
     for language in ANALYZED_LANGUAGES:
