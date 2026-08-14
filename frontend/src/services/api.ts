@@ -332,7 +332,14 @@ export async function proposeRefactor(
     headers: { 'Content-Type': 'application/json' },
   })
   if (!res.ok) {
-    throw new Error(`Failed to propose refactor: status ${res.status}`)
+    let detail = `status ${res.status}`
+    try {
+      const errData = await res.json()
+      if (errData?.detail) detail = errData.detail
+    } catch {
+      // Use status
+    }
+    throw new Error(detail)
   }
   return res.json()
 }
@@ -347,7 +354,14 @@ export async function fetchSafetyScore(
     headers: { 'Content-Type': 'application/json' },
   })
   if (!res.ok) {
-    throw new Error(`Failed to fetch safety score: status ${res.status}`)
+    let detail = `status ${res.status}`
+    try {
+      const errData = await res.json()
+      if (errData?.detail) detail = errData.detail
+    } catch {
+      // Use status
+    }
+    throw new Error(detail)
   }
   return res.json()
 }
