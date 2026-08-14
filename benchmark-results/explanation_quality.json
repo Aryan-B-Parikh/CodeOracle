@@ -1,199 +1,2507 @@
 {
-  "accuracy": 5.0,
-  "benchmark": "explanation-quality-20-functions",
+  "benchmark": "explanation-quality-reference-based",
   "clarity": 5.0,
   "completeness": 5.0,
+  "evaluatorAgreement": {
+    "exactPct": 100.0,
+    "minWithinOnePct": 80.0,
+    "withinOnePct": 100.0
+  },
+  "factualAccuracy": 5.0,
   "functionsEvaluated": 20,
-  "judge": "deterministic-rubric-v1",
+  "groundTruth": "explanation_benchmark_facts.json",
+  "groundingPct": 100.0,
+  "judge": "dual-deterministic-evaluators",
   "judgeProvider": "mock",
   "overall": 5.0,
   "pass": true,
   "perFunction": [
     {
-      "accuracy": 5.0,
-      "clarity": 5.0,
-      "completeness": 5.0,
-      "entity": "process_transaction_1",
-      "evidenceCount": 6,
+      "agreement": {
+        "dimensionDiffs": {
+          "accuracy": 0.0,
+          "clarity": 0.0,
+          "completeness": 0.0
+        },
+        "overallDiff": 0.0,
+        "withinOne": true
+      },
+      "evaluatorA": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "semantic-token-v1",
+        "overall": 5.0
+      },
+      "evaluatorB": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "anchor-pattern-v1",
+        "overall": 5.0
+      },
+      "evidence": [
+        {
+          "claim": "Declares process_transaction_1 at line 3.",
+          "code": "def process_transaction_1(amount: float, fee_rate: float = 0.02) -> float:",
+          "file": "module_1.py",
+          "lineEnd": 3,
+          "lineStart": 3
+        },
+        {
+          "claim": "Code at line 4.",
+          "code": "    \"\"\"Calculate net transaction value for transaction model 1.\"\"\"",
+          "file": "module_1.py",
+          "lineEnd": 4,
+          "lineStart": 4
+        },
+        {
+          "claim": "Conditional control flow at line 5.",
+          "code": "    if amount <= 0.0:",
+          "file": "module_1.py",
+          "lineEnd": 5,
+          "lineStart": 5
+        },
+        {
+          "claim": "Raises an exception at line 6.",
+          "code": "        raise ValueError(\"Transaction amount must be positive\")",
+          "file": "module_1.py",
+          "lineEnd": 6,
+          "lineStart": 6
+        },
+        {
+          "claim": "Code at line 7.",
+          "code": "    fee = amount * fee_rate",
+          "file": "module_1.py",
+          "lineEnd": 7,
+          "lineStart": 7
+        },
+        {
+          "claim": "Code at line 8.",
+          "code": "    net = amount - fee",
+          "file": "module_1.py",
+          "lineEnd": 8,
+          "lineStart": 8
+        }
+      ],
+      "explanation": {
+        "businessRules": "fee = amount * fee_rate; net = amount - fee",
+        "complexity": 2,
+        "controlFlow": "if amount <= 0.0",
+        "dependencies": "ValueError, round",
+        "errorHandling": "raises ValueError; triggered when amount <= 0.0",
+        "inputs": "amount, fee_rate",
+        "outputs": "round(net, 2)",
+        "purpose": "Calculate net transaction value for transaction model 1.",
+        "risks": "Behavior inferred from static analysis; verify against runtime semantics.",
+        "sideEffects": "fee = amount * fee_rate; net = amount - fee"
+      },
       "file": "module_1.py",
-      "grounded": true
+      "function": "process_transaction_1",
+      "grounded": true,
+      "referenceFacts": {
+        "branches": [
+          "amount <= 0.0"
+        ],
+        "errors": [
+          "ValueError when amount <= 0"
+        ],
+        "inputs": [
+          "amount",
+          "fee_rate"
+        ],
+        "outputs": [
+          "net amount rounded to 2 decimals"
+        ],
+        "purpose": [
+          "Calculate the net transaction value after applying a fee"
+        ],
+        "rules": [
+          "fee = amount * fee_rate",
+          "net = amount - fee"
+        ]
+      }
     },
     {
-      "accuracy": 5.0,
-      "clarity": 5.0,
-      "completeness": 5.0,
-      "entity": "process_transaction_10",
-      "evidenceCount": 6,
+      "agreement": {
+        "dimensionDiffs": {
+          "accuracy": 0.0,
+          "clarity": 0.0,
+          "completeness": 0.0
+        },
+        "overallDiff": 0.0,
+        "withinOne": true
+      },
+      "evaluatorA": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "semantic-token-v1",
+        "overall": 5.0
+      },
+      "evaluatorB": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "anchor-pattern-v1",
+        "overall": 5.0
+      },
+      "evidence": [
+        {
+          "claim": "Declares process_transaction_10 at line 3.",
+          "code": "def process_transaction_10(amount: float, fee_rate: float = 0.02) -> float:",
+          "file": "module_10.py",
+          "lineEnd": 3,
+          "lineStart": 3
+        },
+        {
+          "claim": "Code at line 4.",
+          "code": "    \"\"\"Calculate net transaction value for transaction model 10.\"\"\"",
+          "file": "module_10.py",
+          "lineEnd": 4,
+          "lineStart": 4
+        },
+        {
+          "claim": "Conditional control flow at line 5.",
+          "code": "    if amount <= 0.0:",
+          "file": "module_10.py",
+          "lineEnd": 5,
+          "lineStart": 5
+        },
+        {
+          "claim": "Raises an exception at line 6.",
+          "code": "        raise ValueError(\"Transaction amount must be positive\")",
+          "file": "module_10.py",
+          "lineEnd": 6,
+          "lineStart": 6
+        },
+        {
+          "claim": "Code at line 7.",
+          "code": "    fee = amount * fee_rate",
+          "file": "module_10.py",
+          "lineEnd": 7,
+          "lineStart": 7
+        },
+        {
+          "claim": "Code at line 8.",
+          "code": "    net = amount - fee",
+          "file": "module_10.py",
+          "lineEnd": 8,
+          "lineStart": 8
+        }
+      ],
+      "explanation": {
+        "businessRules": "fee = amount * fee_rate; net = amount - fee",
+        "complexity": 2,
+        "controlFlow": "if amount <= 0.0",
+        "dependencies": "ValueError, round",
+        "errorHandling": "raises ValueError; triggered when amount <= 0.0",
+        "inputs": "amount, fee_rate",
+        "outputs": "round(net, 2)",
+        "purpose": "Calculate net transaction value for transaction model 10.",
+        "risks": "Behavior inferred from static analysis; verify against runtime semantics.",
+        "sideEffects": "fee = amount * fee_rate; net = amount - fee"
+      },
       "file": "module_10.py",
-      "grounded": true
+      "function": "process_transaction_10",
+      "grounded": true,
+      "referenceFacts": {
+        "branches": [
+          "amount <= 0.0"
+        ],
+        "errors": [
+          "ValueError when amount <= 0"
+        ],
+        "inputs": [
+          "amount",
+          "fee_rate"
+        ],
+        "outputs": [
+          "net amount rounded to 2 decimals"
+        ],
+        "purpose": [
+          "Calculate the net transaction value after applying a fee"
+        ],
+        "rules": [
+          "fee = amount * fee_rate",
+          "net = amount - fee"
+        ]
+      }
     },
     {
-      "accuracy": 5.0,
-      "clarity": 5.0,
-      "completeness": 5.0,
-      "entity": "process_transaction_11",
-      "evidenceCount": 6,
+      "agreement": {
+        "dimensionDiffs": {
+          "accuracy": 0.0,
+          "clarity": 0.0,
+          "completeness": 0.0
+        },
+        "overallDiff": 0.0,
+        "withinOne": true
+      },
+      "evaluatorA": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "semantic-token-v1",
+        "overall": 5.0
+      },
+      "evaluatorB": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "anchor-pattern-v1",
+        "overall": 5.0
+      },
+      "evidence": [
+        {
+          "claim": "Declares process_transaction_11 at line 3.",
+          "code": "def process_transaction_11(amount: float, fee_rate: float = 0.02) -> float:",
+          "file": "module_11.py",
+          "lineEnd": 3,
+          "lineStart": 3
+        },
+        {
+          "claim": "Code at line 4.",
+          "code": "    \"\"\"Calculate net transaction value for transaction model 11.\"\"\"",
+          "file": "module_11.py",
+          "lineEnd": 4,
+          "lineStart": 4
+        },
+        {
+          "claim": "Conditional control flow at line 5.",
+          "code": "    if amount <= 0.0:",
+          "file": "module_11.py",
+          "lineEnd": 5,
+          "lineStart": 5
+        },
+        {
+          "claim": "Raises an exception at line 6.",
+          "code": "        raise ValueError(\"Transaction amount must be positive\")",
+          "file": "module_11.py",
+          "lineEnd": 6,
+          "lineStart": 6
+        },
+        {
+          "claim": "Code at line 7.",
+          "code": "    fee = amount * fee_rate",
+          "file": "module_11.py",
+          "lineEnd": 7,
+          "lineStart": 7
+        },
+        {
+          "claim": "Code at line 8.",
+          "code": "    net = amount - fee",
+          "file": "module_11.py",
+          "lineEnd": 8,
+          "lineStart": 8
+        }
+      ],
+      "explanation": {
+        "businessRules": "fee = amount * fee_rate; net = amount - fee",
+        "complexity": 2,
+        "controlFlow": "if amount <= 0.0",
+        "dependencies": "ValueError, round",
+        "errorHandling": "raises ValueError; triggered when amount <= 0.0",
+        "inputs": "amount, fee_rate",
+        "outputs": "round(net, 2)",
+        "purpose": "Calculate net transaction value for transaction model 11.",
+        "risks": "Behavior inferred from static analysis; verify against runtime semantics.",
+        "sideEffects": "fee = amount * fee_rate; net = amount - fee"
+      },
       "file": "module_11.py",
-      "grounded": true
+      "function": "process_transaction_11",
+      "grounded": true,
+      "referenceFacts": {
+        "branches": [
+          "amount <= 0.0"
+        ],
+        "errors": [
+          "ValueError when amount <= 0"
+        ],
+        "inputs": [
+          "amount",
+          "fee_rate"
+        ],
+        "outputs": [
+          "net amount rounded to 2 decimals"
+        ],
+        "purpose": [
+          "Calculate the net transaction value after applying a fee"
+        ],
+        "rules": [
+          "fee = amount * fee_rate",
+          "net = amount - fee"
+        ]
+      }
     },
     {
-      "accuracy": 5.0,
-      "clarity": 5.0,
-      "completeness": 5.0,
-      "entity": "process_transaction_12",
-      "evidenceCount": 6,
+      "agreement": {
+        "dimensionDiffs": {
+          "accuracy": 0.0,
+          "clarity": 0.0,
+          "completeness": 0.0
+        },
+        "overallDiff": 0.0,
+        "withinOne": true
+      },
+      "evaluatorA": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "semantic-token-v1",
+        "overall": 5.0
+      },
+      "evaluatorB": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "anchor-pattern-v1",
+        "overall": 5.0
+      },
+      "evidence": [
+        {
+          "claim": "Declares process_transaction_12 at line 3.",
+          "code": "def process_transaction_12(amount: float, fee_rate: float = 0.02) -> float:",
+          "file": "module_12.py",
+          "lineEnd": 3,
+          "lineStart": 3
+        },
+        {
+          "claim": "Code at line 4.",
+          "code": "    \"\"\"Calculate net transaction value for transaction model 12.\"\"\"",
+          "file": "module_12.py",
+          "lineEnd": 4,
+          "lineStart": 4
+        },
+        {
+          "claim": "Conditional control flow at line 5.",
+          "code": "    if amount <= 0.0:",
+          "file": "module_12.py",
+          "lineEnd": 5,
+          "lineStart": 5
+        },
+        {
+          "claim": "Raises an exception at line 6.",
+          "code": "        raise ValueError(\"Transaction amount must be positive\")",
+          "file": "module_12.py",
+          "lineEnd": 6,
+          "lineStart": 6
+        },
+        {
+          "claim": "Code at line 7.",
+          "code": "    fee = amount * fee_rate",
+          "file": "module_12.py",
+          "lineEnd": 7,
+          "lineStart": 7
+        },
+        {
+          "claim": "Code at line 8.",
+          "code": "    net = amount - fee",
+          "file": "module_12.py",
+          "lineEnd": 8,
+          "lineStart": 8
+        }
+      ],
+      "explanation": {
+        "businessRules": "fee = amount * fee_rate; net = amount - fee",
+        "complexity": 2,
+        "controlFlow": "if amount <= 0.0",
+        "dependencies": "ValueError, round",
+        "errorHandling": "raises ValueError; triggered when amount <= 0.0",
+        "inputs": "amount, fee_rate",
+        "outputs": "round(net, 2)",
+        "purpose": "Calculate net transaction value for transaction model 12.",
+        "risks": "Behavior inferred from static analysis; verify against runtime semantics.",
+        "sideEffects": "fee = amount * fee_rate; net = amount - fee"
+      },
       "file": "module_12.py",
-      "grounded": true
+      "function": "process_transaction_12",
+      "grounded": true,
+      "referenceFacts": {
+        "branches": [
+          "amount <= 0.0"
+        ],
+        "errors": [
+          "ValueError when amount <= 0"
+        ],
+        "inputs": [
+          "amount",
+          "fee_rate"
+        ],
+        "outputs": [
+          "net amount rounded to 2 decimals"
+        ],
+        "purpose": [
+          "Calculate the net transaction value after applying a fee"
+        ],
+        "rules": [
+          "fee = amount * fee_rate",
+          "net = amount - fee"
+        ]
+      }
     },
     {
-      "accuracy": 5.0,
-      "clarity": 5.0,
-      "completeness": 5.0,
-      "entity": "process_transaction_13",
-      "evidenceCount": 6,
+      "agreement": {
+        "dimensionDiffs": {
+          "accuracy": 0.0,
+          "clarity": 0.0,
+          "completeness": 0.0
+        },
+        "overallDiff": 0.0,
+        "withinOne": true
+      },
+      "evaluatorA": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "semantic-token-v1",
+        "overall": 5.0
+      },
+      "evaluatorB": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "anchor-pattern-v1",
+        "overall": 5.0
+      },
+      "evidence": [
+        {
+          "claim": "Declares process_transaction_13 at line 3.",
+          "code": "def process_transaction_13(amount: float, fee_rate: float = 0.02) -> float:",
+          "file": "module_13.py",
+          "lineEnd": 3,
+          "lineStart": 3
+        },
+        {
+          "claim": "Code at line 4.",
+          "code": "    \"\"\"Calculate net transaction value for transaction model 13.\"\"\"",
+          "file": "module_13.py",
+          "lineEnd": 4,
+          "lineStart": 4
+        },
+        {
+          "claim": "Conditional control flow at line 5.",
+          "code": "    if amount <= 0.0:",
+          "file": "module_13.py",
+          "lineEnd": 5,
+          "lineStart": 5
+        },
+        {
+          "claim": "Raises an exception at line 6.",
+          "code": "        raise ValueError(\"Transaction amount must be positive\")",
+          "file": "module_13.py",
+          "lineEnd": 6,
+          "lineStart": 6
+        },
+        {
+          "claim": "Code at line 7.",
+          "code": "    fee = amount * fee_rate",
+          "file": "module_13.py",
+          "lineEnd": 7,
+          "lineStart": 7
+        },
+        {
+          "claim": "Code at line 8.",
+          "code": "    net = amount - fee",
+          "file": "module_13.py",
+          "lineEnd": 8,
+          "lineStart": 8
+        }
+      ],
+      "explanation": {
+        "businessRules": "fee = amount * fee_rate; net = amount - fee",
+        "complexity": 2,
+        "controlFlow": "if amount <= 0.0",
+        "dependencies": "ValueError, round",
+        "errorHandling": "raises ValueError; triggered when amount <= 0.0",
+        "inputs": "amount, fee_rate",
+        "outputs": "round(net, 2)",
+        "purpose": "Calculate net transaction value for transaction model 13.",
+        "risks": "Behavior inferred from static analysis; verify against runtime semantics.",
+        "sideEffects": "fee = amount * fee_rate; net = amount - fee"
+      },
       "file": "module_13.py",
-      "grounded": true
+      "function": "process_transaction_13",
+      "grounded": true,
+      "referenceFacts": {
+        "branches": [
+          "amount <= 0.0"
+        ],
+        "errors": [
+          "ValueError when amount <= 0"
+        ],
+        "inputs": [
+          "amount",
+          "fee_rate"
+        ],
+        "outputs": [
+          "net amount rounded to 2 decimals"
+        ],
+        "purpose": [
+          "Calculate the net transaction value after applying a fee"
+        ],
+        "rules": [
+          "fee = amount * fee_rate",
+          "net = amount - fee"
+        ]
+      }
     },
     {
-      "accuracy": 5.0,
-      "clarity": 5.0,
-      "completeness": 5.0,
-      "entity": "process_transaction_14",
-      "evidenceCount": 6,
+      "agreement": {
+        "dimensionDiffs": {
+          "accuracy": 0.0,
+          "clarity": 0.0,
+          "completeness": 0.0
+        },
+        "overallDiff": 0.0,
+        "withinOne": true
+      },
+      "evaluatorA": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "semantic-token-v1",
+        "overall": 5.0
+      },
+      "evaluatorB": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "anchor-pattern-v1",
+        "overall": 5.0
+      },
+      "evidence": [
+        {
+          "claim": "Declares process_transaction_14 at line 3.",
+          "code": "def process_transaction_14(amount: float, fee_rate: float = 0.02) -> float:",
+          "file": "module_14.py",
+          "lineEnd": 3,
+          "lineStart": 3
+        },
+        {
+          "claim": "Code at line 4.",
+          "code": "    \"\"\"Calculate net transaction value for transaction model 14.\"\"\"",
+          "file": "module_14.py",
+          "lineEnd": 4,
+          "lineStart": 4
+        },
+        {
+          "claim": "Conditional control flow at line 5.",
+          "code": "    if amount <= 0.0:",
+          "file": "module_14.py",
+          "lineEnd": 5,
+          "lineStart": 5
+        },
+        {
+          "claim": "Raises an exception at line 6.",
+          "code": "        raise ValueError(\"Transaction amount must be positive\")",
+          "file": "module_14.py",
+          "lineEnd": 6,
+          "lineStart": 6
+        },
+        {
+          "claim": "Code at line 7.",
+          "code": "    fee = amount * fee_rate",
+          "file": "module_14.py",
+          "lineEnd": 7,
+          "lineStart": 7
+        },
+        {
+          "claim": "Code at line 8.",
+          "code": "    net = amount - fee",
+          "file": "module_14.py",
+          "lineEnd": 8,
+          "lineStart": 8
+        }
+      ],
+      "explanation": {
+        "businessRules": "fee = amount * fee_rate; net = amount - fee",
+        "complexity": 2,
+        "controlFlow": "if amount <= 0.0",
+        "dependencies": "ValueError, round",
+        "errorHandling": "raises ValueError; triggered when amount <= 0.0",
+        "inputs": "amount, fee_rate",
+        "outputs": "round(net, 2)",
+        "purpose": "Calculate net transaction value for transaction model 14.",
+        "risks": "Behavior inferred from static analysis; verify against runtime semantics.",
+        "sideEffects": "fee = amount * fee_rate; net = amount - fee"
+      },
       "file": "module_14.py",
-      "grounded": true
+      "function": "process_transaction_14",
+      "grounded": true,
+      "referenceFacts": {
+        "branches": [
+          "amount <= 0.0"
+        ],
+        "errors": [
+          "ValueError when amount <= 0"
+        ],
+        "inputs": [
+          "amount",
+          "fee_rate"
+        ],
+        "outputs": [
+          "net amount rounded to 2 decimals"
+        ],
+        "purpose": [
+          "Calculate the net transaction value after applying a fee"
+        ],
+        "rules": [
+          "fee = amount * fee_rate",
+          "net = amount - fee"
+        ]
+      }
     },
     {
-      "accuracy": 5.0,
-      "clarity": 5.0,
-      "completeness": 5.0,
-      "entity": "process_transaction_15",
-      "evidenceCount": 6,
+      "agreement": {
+        "dimensionDiffs": {
+          "accuracy": 0.0,
+          "clarity": 0.0,
+          "completeness": 0.0
+        },
+        "overallDiff": 0.0,
+        "withinOne": true
+      },
+      "evaluatorA": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "semantic-token-v1",
+        "overall": 5.0
+      },
+      "evaluatorB": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "anchor-pattern-v1",
+        "overall": 5.0
+      },
+      "evidence": [
+        {
+          "claim": "Declares process_transaction_15 at line 3.",
+          "code": "def process_transaction_15(amount: float, fee_rate: float = 0.02) -> float:",
+          "file": "module_15.py",
+          "lineEnd": 3,
+          "lineStart": 3
+        },
+        {
+          "claim": "Code at line 4.",
+          "code": "    \"\"\"Calculate net transaction value for transaction model 15.\"\"\"",
+          "file": "module_15.py",
+          "lineEnd": 4,
+          "lineStart": 4
+        },
+        {
+          "claim": "Conditional control flow at line 5.",
+          "code": "    if amount <= 0.0:",
+          "file": "module_15.py",
+          "lineEnd": 5,
+          "lineStart": 5
+        },
+        {
+          "claim": "Raises an exception at line 6.",
+          "code": "        raise ValueError(\"Transaction amount must be positive\")",
+          "file": "module_15.py",
+          "lineEnd": 6,
+          "lineStart": 6
+        },
+        {
+          "claim": "Code at line 7.",
+          "code": "    fee = amount * fee_rate",
+          "file": "module_15.py",
+          "lineEnd": 7,
+          "lineStart": 7
+        },
+        {
+          "claim": "Code at line 8.",
+          "code": "    net = amount - fee",
+          "file": "module_15.py",
+          "lineEnd": 8,
+          "lineStart": 8
+        }
+      ],
+      "explanation": {
+        "businessRules": "fee = amount * fee_rate; net = amount - fee",
+        "complexity": 2,
+        "controlFlow": "if amount <= 0.0",
+        "dependencies": "ValueError, round",
+        "errorHandling": "raises ValueError; triggered when amount <= 0.0",
+        "inputs": "amount, fee_rate",
+        "outputs": "round(net, 2)",
+        "purpose": "Calculate net transaction value for transaction model 15.",
+        "risks": "Behavior inferred from static analysis; verify against runtime semantics.",
+        "sideEffects": "fee = amount * fee_rate; net = amount - fee"
+      },
       "file": "module_15.py",
-      "grounded": true
+      "function": "process_transaction_15",
+      "grounded": true,
+      "referenceFacts": {
+        "branches": [
+          "amount <= 0.0"
+        ],
+        "errors": [
+          "ValueError when amount <= 0"
+        ],
+        "inputs": [
+          "amount",
+          "fee_rate"
+        ],
+        "outputs": [
+          "net amount rounded to 2 decimals"
+        ],
+        "purpose": [
+          "Calculate the net transaction value after applying a fee"
+        ],
+        "rules": [
+          "fee = amount * fee_rate",
+          "net = amount - fee"
+        ]
+      }
     },
     {
-      "accuracy": 5.0,
-      "clarity": 5.0,
-      "completeness": 5.0,
-      "entity": "process_transaction_16",
-      "evidenceCount": 6,
+      "agreement": {
+        "dimensionDiffs": {
+          "accuracy": 0.0,
+          "clarity": 0.0,
+          "completeness": 0.0
+        },
+        "overallDiff": 0.0,
+        "withinOne": true
+      },
+      "evaluatorA": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "semantic-token-v1",
+        "overall": 5.0
+      },
+      "evaluatorB": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "anchor-pattern-v1",
+        "overall": 5.0
+      },
+      "evidence": [
+        {
+          "claim": "Declares process_transaction_16 at line 3.",
+          "code": "def process_transaction_16(amount: float, fee_rate: float = 0.02) -> float:",
+          "file": "module_16.py",
+          "lineEnd": 3,
+          "lineStart": 3
+        },
+        {
+          "claim": "Code at line 4.",
+          "code": "    \"\"\"Calculate net transaction value for transaction model 16.\"\"\"",
+          "file": "module_16.py",
+          "lineEnd": 4,
+          "lineStart": 4
+        },
+        {
+          "claim": "Conditional control flow at line 5.",
+          "code": "    if amount <= 0.0:",
+          "file": "module_16.py",
+          "lineEnd": 5,
+          "lineStart": 5
+        },
+        {
+          "claim": "Raises an exception at line 6.",
+          "code": "        raise ValueError(\"Transaction amount must be positive\")",
+          "file": "module_16.py",
+          "lineEnd": 6,
+          "lineStart": 6
+        },
+        {
+          "claim": "Code at line 7.",
+          "code": "    fee = amount * fee_rate",
+          "file": "module_16.py",
+          "lineEnd": 7,
+          "lineStart": 7
+        },
+        {
+          "claim": "Code at line 8.",
+          "code": "    net = amount - fee",
+          "file": "module_16.py",
+          "lineEnd": 8,
+          "lineStart": 8
+        }
+      ],
+      "explanation": {
+        "businessRules": "fee = amount * fee_rate; net = amount - fee",
+        "complexity": 2,
+        "controlFlow": "if amount <= 0.0",
+        "dependencies": "ValueError, round",
+        "errorHandling": "raises ValueError; triggered when amount <= 0.0",
+        "inputs": "amount, fee_rate",
+        "outputs": "round(net, 2)",
+        "purpose": "Calculate net transaction value for transaction model 16.",
+        "risks": "Behavior inferred from static analysis; verify against runtime semantics.",
+        "sideEffects": "fee = amount * fee_rate; net = amount - fee"
+      },
       "file": "module_16.py",
-      "grounded": true
+      "function": "process_transaction_16",
+      "grounded": true,
+      "referenceFacts": {
+        "branches": [
+          "amount <= 0.0"
+        ],
+        "errors": [
+          "ValueError when amount <= 0"
+        ],
+        "inputs": [
+          "amount",
+          "fee_rate"
+        ],
+        "outputs": [
+          "net amount rounded to 2 decimals"
+        ],
+        "purpose": [
+          "Calculate the net transaction value after applying a fee"
+        ],
+        "rules": [
+          "fee = amount * fee_rate",
+          "net = amount - fee"
+        ]
+      }
     },
     {
-      "accuracy": 5.0,
-      "clarity": 5.0,
-      "completeness": 5.0,
-      "entity": "process_transaction_17",
-      "evidenceCount": 6,
+      "agreement": {
+        "dimensionDiffs": {
+          "accuracy": 0.0,
+          "clarity": 0.0,
+          "completeness": 0.0
+        },
+        "overallDiff": 0.0,
+        "withinOne": true
+      },
+      "evaluatorA": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "semantic-token-v1",
+        "overall": 5.0
+      },
+      "evaluatorB": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "anchor-pattern-v1",
+        "overall": 5.0
+      },
+      "evidence": [
+        {
+          "claim": "Declares process_transaction_17 at line 3.",
+          "code": "def process_transaction_17(amount: float, fee_rate: float = 0.02) -> float:",
+          "file": "module_17.py",
+          "lineEnd": 3,
+          "lineStart": 3
+        },
+        {
+          "claim": "Code at line 4.",
+          "code": "    \"\"\"Calculate net transaction value for transaction model 17.\"\"\"",
+          "file": "module_17.py",
+          "lineEnd": 4,
+          "lineStart": 4
+        },
+        {
+          "claim": "Conditional control flow at line 5.",
+          "code": "    if amount <= 0.0:",
+          "file": "module_17.py",
+          "lineEnd": 5,
+          "lineStart": 5
+        },
+        {
+          "claim": "Raises an exception at line 6.",
+          "code": "        raise ValueError(\"Transaction amount must be positive\")",
+          "file": "module_17.py",
+          "lineEnd": 6,
+          "lineStart": 6
+        },
+        {
+          "claim": "Code at line 7.",
+          "code": "    fee = amount * fee_rate",
+          "file": "module_17.py",
+          "lineEnd": 7,
+          "lineStart": 7
+        },
+        {
+          "claim": "Code at line 8.",
+          "code": "    net = amount - fee",
+          "file": "module_17.py",
+          "lineEnd": 8,
+          "lineStart": 8
+        }
+      ],
+      "explanation": {
+        "businessRules": "fee = amount * fee_rate; net = amount - fee",
+        "complexity": 2,
+        "controlFlow": "if amount <= 0.0",
+        "dependencies": "ValueError, round",
+        "errorHandling": "raises ValueError; triggered when amount <= 0.0",
+        "inputs": "amount, fee_rate",
+        "outputs": "round(net, 2)",
+        "purpose": "Calculate net transaction value for transaction model 17.",
+        "risks": "Behavior inferred from static analysis; verify against runtime semantics.",
+        "sideEffects": "fee = amount * fee_rate; net = amount - fee"
+      },
       "file": "module_17.py",
-      "grounded": true
+      "function": "process_transaction_17",
+      "grounded": true,
+      "referenceFacts": {
+        "branches": [
+          "amount <= 0.0"
+        ],
+        "errors": [
+          "ValueError when amount <= 0"
+        ],
+        "inputs": [
+          "amount",
+          "fee_rate"
+        ],
+        "outputs": [
+          "net amount rounded to 2 decimals"
+        ],
+        "purpose": [
+          "Calculate the net transaction value after applying a fee"
+        ],
+        "rules": [
+          "fee = amount * fee_rate",
+          "net = amount - fee"
+        ]
+      }
     },
     {
-      "accuracy": 5.0,
-      "clarity": 5.0,
-      "completeness": 5.0,
-      "entity": "process_transaction_18",
-      "evidenceCount": 6,
+      "agreement": {
+        "dimensionDiffs": {
+          "accuracy": 0.0,
+          "clarity": 0.0,
+          "completeness": 0.0
+        },
+        "overallDiff": 0.0,
+        "withinOne": true
+      },
+      "evaluatorA": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "semantic-token-v1",
+        "overall": 5.0
+      },
+      "evaluatorB": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "anchor-pattern-v1",
+        "overall": 5.0
+      },
+      "evidence": [
+        {
+          "claim": "Declares process_transaction_18 at line 3.",
+          "code": "def process_transaction_18(amount: float, fee_rate: float = 0.02) -> float:",
+          "file": "module_18.py",
+          "lineEnd": 3,
+          "lineStart": 3
+        },
+        {
+          "claim": "Code at line 4.",
+          "code": "    \"\"\"Calculate net transaction value for transaction model 18.\"\"\"",
+          "file": "module_18.py",
+          "lineEnd": 4,
+          "lineStart": 4
+        },
+        {
+          "claim": "Conditional control flow at line 5.",
+          "code": "    if amount <= 0.0:",
+          "file": "module_18.py",
+          "lineEnd": 5,
+          "lineStart": 5
+        },
+        {
+          "claim": "Raises an exception at line 6.",
+          "code": "        raise ValueError(\"Transaction amount must be positive\")",
+          "file": "module_18.py",
+          "lineEnd": 6,
+          "lineStart": 6
+        },
+        {
+          "claim": "Code at line 7.",
+          "code": "    fee = amount * fee_rate",
+          "file": "module_18.py",
+          "lineEnd": 7,
+          "lineStart": 7
+        },
+        {
+          "claim": "Code at line 8.",
+          "code": "    net = amount - fee",
+          "file": "module_18.py",
+          "lineEnd": 8,
+          "lineStart": 8
+        }
+      ],
+      "explanation": {
+        "businessRules": "fee = amount * fee_rate; net = amount - fee",
+        "complexity": 2,
+        "controlFlow": "if amount <= 0.0",
+        "dependencies": "ValueError, round",
+        "errorHandling": "raises ValueError; triggered when amount <= 0.0",
+        "inputs": "amount, fee_rate",
+        "outputs": "round(net, 2)",
+        "purpose": "Calculate net transaction value for transaction model 18.",
+        "risks": "Behavior inferred from static analysis; verify against runtime semantics.",
+        "sideEffects": "fee = amount * fee_rate; net = amount - fee"
+      },
       "file": "module_18.py",
-      "grounded": true
+      "function": "process_transaction_18",
+      "grounded": true,
+      "referenceFacts": {
+        "branches": [
+          "amount <= 0.0"
+        ],
+        "errors": [
+          "ValueError when amount <= 0"
+        ],
+        "inputs": [
+          "amount",
+          "fee_rate"
+        ],
+        "outputs": [
+          "net amount rounded to 2 decimals"
+        ],
+        "purpose": [
+          "Calculate the net transaction value after applying a fee"
+        ],
+        "rules": [
+          "fee = amount * fee_rate",
+          "net = amount - fee"
+        ]
+      }
     },
     {
-      "accuracy": 5.0,
-      "clarity": 5.0,
-      "completeness": 5.0,
-      "entity": "process_transaction_19",
-      "evidenceCount": 6,
+      "agreement": {
+        "dimensionDiffs": {
+          "accuracy": 0.0,
+          "clarity": 0.0,
+          "completeness": 0.0
+        },
+        "overallDiff": 0.0,
+        "withinOne": true
+      },
+      "evaluatorA": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "semantic-token-v1",
+        "overall": 5.0
+      },
+      "evaluatorB": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "anchor-pattern-v1",
+        "overall": 5.0
+      },
+      "evidence": [
+        {
+          "claim": "Declares process_transaction_19 at line 3.",
+          "code": "def process_transaction_19(amount: float, fee_rate: float = 0.02) -> float:",
+          "file": "module_19.py",
+          "lineEnd": 3,
+          "lineStart": 3
+        },
+        {
+          "claim": "Code at line 4.",
+          "code": "    \"\"\"Calculate net transaction value for transaction model 19.\"\"\"",
+          "file": "module_19.py",
+          "lineEnd": 4,
+          "lineStart": 4
+        },
+        {
+          "claim": "Conditional control flow at line 5.",
+          "code": "    if amount <= 0.0:",
+          "file": "module_19.py",
+          "lineEnd": 5,
+          "lineStart": 5
+        },
+        {
+          "claim": "Raises an exception at line 6.",
+          "code": "        raise ValueError(\"Transaction amount must be positive\")",
+          "file": "module_19.py",
+          "lineEnd": 6,
+          "lineStart": 6
+        },
+        {
+          "claim": "Code at line 7.",
+          "code": "    fee = amount * fee_rate",
+          "file": "module_19.py",
+          "lineEnd": 7,
+          "lineStart": 7
+        },
+        {
+          "claim": "Code at line 8.",
+          "code": "    net = amount - fee",
+          "file": "module_19.py",
+          "lineEnd": 8,
+          "lineStart": 8
+        }
+      ],
+      "explanation": {
+        "businessRules": "fee = amount * fee_rate; net = amount - fee",
+        "complexity": 2,
+        "controlFlow": "if amount <= 0.0",
+        "dependencies": "ValueError, round",
+        "errorHandling": "raises ValueError; triggered when amount <= 0.0",
+        "inputs": "amount, fee_rate",
+        "outputs": "round(net, 2)",
+        "purpose": "Calculate net transaction value for transaction model 19.",
+        "risks": "Behavior inferred from static analysis; verify against runtime semantics.",
+        "sideEffects": "fee = amount * fee_rate; net = amount - fee"
+      },
       "file": "module_19.py",
-      "grounded": true
+      "function": "process_transaction_19",
+      "grounded": true,
+      "referenceFacts": {
+        "branches": [
+          "amount <= 0.0"
+        ],
+        "errors": [
+          "ValueError when amount <= 0"
+        ],
+        "inputs": [
+          "amount",
+          "fee_rate"
+        ],
+        "outputs": [
+          "net amount rounded to 2 decimals"
+        ],
+        "purpose": [
+          "Calculate the net transaction value after applying a fee"
+        ],
+        "rules": [
+          "fee = amount * fee_rate",
+          "net = amount - fee"
+        ]
+      }
     },
     {
-      "accuracy": 5.0,
-      "clarity": 5.0,
-      "completeness": 5.0,
-      "entity": "process_transaction_2",
-      "evidenceCount": 6,
+      "agreement": {
+        "dimensionDiffs": {
+          "accuracy": 0.0,
+          "clarity": 0.0,
+          "completeness": 0.0
+        },
+        "overallDiff": 0.0,
+        "withinOne": true
+      },
+      "evaluatorA": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "semantic-token-v1",
+        "overall": 5.0
+      },
+      "evaluatorB": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "anchor-pattern-v1",
+        "overall": 5.0
+      },
+      "evidence": [
+        {
+          "claim": "Declares process_transaction_2 at line 3.",
+          "code": "def process_transaction_2(amount: float, fee_rate: float = 0.02) -> float:",
+          "file": "module_2.py",
+          "lineEnd": 3,
+          "lineStart": 3
+        },
+        {
+          "claim": "Code at line 4.",
+          "code": "    \"\"\"Calculate net transaction value for transaction model 2.\"\"\"",
+          "file": "module_2.py",
+          "lineEnd": 4,
+          "lineStart": 4
+        },
+        {
+          "claim": "Conditional control flow at line 5.",
+          "code": "    if amount <= 0.0:",
+          "file": "module_2.py",
+          "lineEnd": 5,
+          "lineStart": 5
+        },
+        {
+          "claim": "Raises an exception at line 6.",
+          "code": "        raise ValueError(\"Transaction amount must be positive\")",
+          "file": "module_2.py",
+          "lineEnd": 6,
+          "lineStart": 6
+        },
+        {
+          "claim": "Code at line 7.",
+          "code": "    fee = amount * fee_rate",
+          "file": "module_2.py",
+          "lineEnd": 7,
+          "lineStart": 7
+        },
+        {
+          "claim": "Code at line 8.",
+          "code": "    net = amount - fee",
+          "file": "module_2.py",
+          "lineEnd": 8,
+          "lineStart": 8
+        }
+      ],
+      "explanation": {
+        "businessRules": "fee = amount * fee_rate; net = amount - fee",
+        "complexity": 2,
+        "controlFlow": "if amount <= 0.0",
+        "dependencies": "ValueError, round",
+        "errorHandling": "raises ValueError; triggered when amount <= 0.0",
+        "inputs": "amount, fee_rate",
+        "outputs": "round(net, 2)",
+        "purpose": "Calculate net transaction value for transaction model 2.",
+        "risks": "Behavior inferred from static analysis; verify against runtime semantics.",
+        "sideEffects": "fee = amount * fee_rate; net = amount - fee"
+      },
       "file": "module_2.py",
-      "grounded": true
+      "function": "process_transaction_2",
+      "grounded": true,
+      "referenceFacts": {
+        "branches": [
+          "amount <= 0.0"
+        ],
+        "errors": [
+          "ValueError when amount <= 0"
+        ],
+        "inputs": [
+          "amount",
+          "fee_rate"
+        ],
+        "outputs": [
+          "net amount rounded to 2 decimals"
+        ],
+        "purpose": [
+          "Calculate the net transaction value after applying a fee"
+        ],
+        "rules": [
+          "fee = amount * fee_rate",
+          "net = amount - fee"
+        ]
+      }
     },
     {
-      "accuracy": 5.0,
-      "clarity": 5.0,
-      "completeness": 5.0,
-      "entity": "process_transaction_20",
-      "evidenceCount": 6,
+      "agreement": {
+        "dimensionDiffs": {
+          "accuracy": 0.0,
+          "clarity": 0.0,
+          "completeness": 0.0
+        },
+        "overallDiff": 0.0,
+        "withinOne": true
+      },
+      "evaluatorA": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "semantic-token-v1",
+        "overall": 5.0
+      },
+      "evaluatorB": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "anchor-pattern-v1",
+        "overall": 5.0
+      },
+      "evidence": [
+        {
+          "claim": "Declares process_transaction_20 at line 3.",
+          "code": "def process_transaction_20(amount: float, fee_rate: float = 0.02) -> float:",
+          "file": "module_20.py",
+          "lineEnd": 3,
+          "lineStart": 3
+        },
+        {
+          "claim": "Code at line 4.",
+          "code": "    \"\"\"Calculate net transaction value for transaction model 20.\"\"\"",
+          "file": "module_20.py",
+          "lineEnd": 4,
+          "lineStart": 4
+        },
+        {
+          "claim": "Conditional control flow at line 5.",
+          "code": "    if amount <= 0.0:",
+          "file": "module_20.py",
+          "lineEnd": 5,
+          "lineStart": 5
+        },
+        {
+          "claim": "Raises an exception at line 6.",
+          "code": "        raise ValueError(\"Transaction amount must be positive\")",
+          "file": "module_20.py",
+          "lineEnd": 6,
+          "lineStart": 6
+        },
+        {
+          "claim": "Code at line 7.",
+          "code": "    fee = amount * fee_rate",
+          "file": "module_20.py",
+          "lineEnd": 7,
+          "lineStart": 7
+        },
+        {
+          "claim": "Code at line 8.",
+          "code": "    net = amount - fee",
+          "file": "module_20.py",
+          "lineEnd": 8,
+          "lineStart": 8
+        }
+      ],
+      "explanation": {
+        "businessRules": "fee = amount * fee_rate; net = amount - fee",
+        "complexity": 2,
+        "controlFlow": "if amount <= 0.0",
+        "dependencies": "ValueError, round",
+        "errorHandling": "raises ValueError; triggered when amount <= 0.0",
+        "inputs": "amount, fee_rate",
+        "outputs": "round(net, 2)",
+        "purpose": "Calculate net transaction value for transaction model 20.",
+        "risks": "Behavior inferred from static analysis; verify against runtime semantics.",
+        "sideEffects": "fee = amount * fee_rate; net = amount - fee"
+      },
       "file": "module_20.py",
-      "grounded": true
+      "function": "process_transaction_20",
+      "grounded": true,
+      "referenceFacts": {
+        "branches": [
+          "amount <= 0.0"
+        ],
+        "errors": [
+          "ValueError when amount <= 0"
+        ],
+        "inputs": [
+          "amount",
+          "fee_rate"
+        ],
+        "outputs": [
+          "net amount rounded to 2 decimals"
+        ],
+        "purpose": [
+          "Calculate the net transaction value after applying a fee"
+        ],
+        "rules": [
+          "fee = amount * fee_rate",
+          "net = amount - fee"
+        ]
+      }
     },
     {
-      "accuracy": 5.0,
-      "clarity": 5.0,
-      "completeness": 5.0,
-      "entity": "process_transaction_3",
-      "evidenceCount": 6,
+      "agreement": {
+        "dimensionDiffs": {
+          "accuracy": 0.0,
+          "clarity": 0.0,
+          "completeness": 0.0
+        },
+        "overallDiff": 0.0,
+        "withinOne": true
+      },
+      "evaluatorA": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "semantic-token-v1",
+        "overall": 5.0
+      },
+      "evaluatorB": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "anchor-pattern-v1",
+        "overall": 5.0
+      },
+      "evidence": [
+        {
+          "claim": "Declares process_transaction_3 at line 3.",
+          "code": "def process_transaction_3(amount: float, fee_rate: float = 0.02) -> float:",
+          "file": "module_3.py",
+          "lineEnd": 3,
+          "lineStart": 3
+        },
+        {
+          "claim": "Code at line 4.",
+          "code": "    \"\"\"Calculate net transaction value for transaction model 3.\"\"\"",
+          "file": "module_3.py",
+          "lineEnd": 4,
+          "lineStart": 4
+        },
+        {
+          "claim": "Conditional control flow at line 5.",
+          "code": "    if amount <= 0.0:",
+          "file": "module_3.py",
+          "lineEnd": 5,
+          "lineStart": 5
+        },
+        {
+          "claim": "Raises an exception at line 6.",
+          "code": "        raise ValueError(\"Transaction amount must be positive\")",
+          "file": "module_3.py",
+          "lineEnd": 6,
+          "lineStart": 6
+        },
+        {
+          "claim": "Code at line 7.",
+          "code": "    fee = amount * fee_rate",
+          "file": "module_3.py",
+          "lineEnd": 7,
+          "lineStart": 7
+        },
+        {
+          "claim": "Code at line 8.",
+          "code": "    net = amount - fee",
+          "file": "module_3.py",
+          "lineEnd": 8,
+          "lineStart": 8
+        }
+      ],
+      "explanation": {
+        "businessRules": "fee = amount * fee_rate; net = amount - fee",
+        "complexity": 2,
+        "controlFlow": "if amount <= 0.0",
+        "dependencies": "ValueError, round",
+        "errorHandling": "raises ValueError; triggered when amount <= 0.0",
+        "inputs": "amount, fee_rate",
+        "outputs": "round(net, 2)",
+        "purpose": "Calculate net transaction value for transaction model 3.",
+        "risks": "Behavior inferred from static analysis; verify against runtime semantics.",
+        "sideEffects": "fee = amount * fee_rate; net = amount - fee"
+      },
       "file": "module_3.py",
-      "grounded": true
+      "function": "process_transaction_3",
+      "grounded": true,
+      "referenceFacts": {
+        "branches": [
+          "amount <= 0.0"
+        ],
+        "errors": [
+          "ValueError when amount <= 0"
+        ],
+        "inputs": [
+          "amount",
+          "fee_rate"
+        ],
+        "outputs": [
+          "net amount rounded to 2 decimals"
+        ],
+        "purpose": [
+          "Calculate the net transaction value after applying a fee"
+        ],
+        "rules": [
+          "fee = amount * fee_rate",
+          "net = amount - fee"
+        ]
+      }
     },
     {
-      "accuracy": 5.0,
-      "clarity": 5.0,
-      "completeness": 5.0,
-      "entity": "process_transaction_4",
-      "evidenceCount": 6,
+      "agreement": {
+        "dimensionDiffs": {
+          "accuracy": 0.0,
+          "clarity": 0.0,
+          "completeness": 0.0
+        },
+        "overallDiff": 0.0,
+        "withinOne": true
+      },
+      "evaluatorA": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "semantic-token-v1",
+        "overall": 5.0
+      },
+      "evaluatorB": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "anchor-pattern-v1",
+        "overall": 5.0
+      },
+      "evidence": [
+        {
+          "claim": "Declares process_transaction_4 at line 3.",
+          "code": "def process_transaction_4(amount: float, fee_rate: float = 0.02) -> float:",
+          "file": "module_4.py",
+          "lineEnd": 3,
+          "lineStart": 3
+        },
+        {
+          "claim": "Code at line 4.",
+          "code": "    \"\"\"Calculate net transaction value for transaction model 4.\"\"\"",
+          "file": "module_4.py",
+          "lineEnd": 4,
+          "lineStart": 4
+        },
+        {
+          "claim": "Conditional control flow at line 5.",
+          "code": "    if amount <= 0.0:",
+          "file": "module_4.py",
+          "lineEnd": 5,
+          "lineStart": 5
+        },
+        {
+          "claim": "Raises an exception at line 6.",
+          "code": "        raise ValueError(\"Transaction amount must be positive\")",
+          "file": "module_4.py",
+          "lineEnd": 6,
+          "lineStart": 6
+        },
+        {
+          "claim": "Code at line 7.",
+          "code": "    fee = amount * fee_rate",
+          "file": "module_4.py",
+          "lineEnd": 7,
+          "lineStart": 7
+        },
+        {
+          "claim": "Code at line 8.",
+          "code": "    net = amount - fee",
+          "file": "module_4.py",
+          "lineEnd": 8,
+          "lineStart": 8
+        }
+      ],
+      "explanation": {
+        "businessRules": "fee = amount * fee_rate; net = amount - fee",
+        "complexity": 2,
+        "controlFlow": "if amount <= 0.0",
+        "dependencies": "ValueError, round",
+        "errorHandling": "raises ValueError; triggered when amount <= 0.0",
+        "inputs": "amount, fee_rate",
+        "outputs": "round(net, 2)",
+        "purpose": "Calculate net transaction value for transaction model 4.",
+        "risks": "Behavior inferred from static analysis; verify against runtime semantics.",
+        "sideEffects": "fee = amount * fee_rate; net = amount - fee"
+      },
       "file": "module_4.py",
-      "grounded": true
+      "function": "process_transaction_4",
+      "grounded": true,
+      "referenceFacts": {
+        "branches": [
+          "amount <= 0.0"
+        ],
+        "errors": [
+          "ValueError when amount <= 0"
+        ],
+        "inputs": [
+          "amount",
+          "fee_rate"
+        ],
+        "outputs": [
+          "net amount rounded to 2 decimals"
+        ],
+        "purpose": [
+          "Calculate the net transaction value after applying a fee"
+        ],
+        "rules": [
+          "fee = amount * fee_rate",
+          "net = amount - fee"
+        ]
+      }
     },
     {
-      "accuracy": 5.0,
-      "clarity": 5.0,
-      "completeness": 5.0,
-      "entity": "process_transaction_5",
-      "evidenceCount": 6,
+      "agreement": {
+        "dimensionDiffs": {
+          "accuracy": 0.0,
+          "clarity": 0.0,
+          "completeness": 0.0
+        },
+        "overallDiff": 0.0,
+        "withinOne": true
+      },
+      "evaluatorA": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "semantic-token-v1",
+        "overall": 5.0
+      },
+      "evaluatorB": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "anchor-pattern-v1",
+        "overall": 5.0
+      },
+      "evidence": [
+        {
+          "claim": "Declares process_transaction_5 at line 3.",
+          "code": "def process_transaction_5(amount: float, fee_rate: float = 0.02) -> float:",
+          "file": "module_5.py",
+          "lineEnd": 3,
+          "lineStart": 3
+        },
+        {
+          "claim": "Code at line 4.",
+          "code": "    \"\"\"Calculate net transaction value for transaction model 5.\"\"\"",
+          "file": "module_5.py",
+          "lineEnd": 4,
+          "lineStart": 4
+        },
+        {
+          "claim": "Conditional control flow at line 5.",
+          "code": "    if amount <= 0.0:",
+          "file": "module_5.py",
+          "lineEnd": 5,
+          "lineStart": 5
+        },
+        {
+          "claim": "Raises an exception at line 6.",
+          "code": "        raise ValueError(\"Transaction amount must be positive\")",
+          "file": "module_5.py",
+          "lineEnd": 6,
+          "lineStart": 6
+        },
+        {
+          "claim": "Code at line 7.",
+          "code": "    fee = amount * fee_rate",
+          "file": "module_5.py",
+          "lineEnd": 7,
+          "lineStart": 7
+        },
+        {
+          "claim": "Code at line 8.",
+          "code": "    net = amount - fee",
+          "file": "module_5.py",
+          "lineEnd": 8,
+          "lineStart": 8
+        }
+      ],
+      "explanation": {
+        "businessRules": "fee = amount * fee_rate; net = amount - fee",
+        "complexity": 2,
+        "controlFlow": "if amount <= 0.0",
+        "dependencies": "ValueError, round",
+        "errorHandling": "raises ValueError; triggered when amount <= 0.0",
+        "inputs": "amount, fee_rate",
+        "outputs": "round(net, 2)",
+        "purpose": "Calculate net transaction value for transaction model 5.",
+        "risks": "Behavior inferred from static analysis; verify against runtime semantics.",
+        "sideEffects": "fee = amount * fee_rate; net = amount - fee"
+      },
       "file": "module_5.py",
-      "grounded": true
+      "function": "process_transaction_5",
+      "grounded": true,
+      "referenceFacts": {
+        "branches": [
+          "amount <= 0.0"
+        ],
+        "errors": [
+          "ValueError when amount <= 0"
+        ],
+        "inputs": [
+          "amount",
+          "fee_rate"
+        ],
+        "outputs": [
+          "net amount rounded to 2 decimals"
+        ],
+        "purpose": [
+          "Calculate the net transaction value after applying a fee"
+        ],
+        "rules": [
+          "fee = amount * fee_rate",
+          "net = amount - fee"
+        ]
+      }
     },
     {
-      "accuracy": 5.0,
-      "clarity": 5.0,
-      "completeness": 5.0,
-      "entity": "process_transaction_6",
-      "evidenceCount": 6,
+      "agreement": {
+        "dimensionDiffs": {
+          "accuracy": 0.0,
+          "clarity": 0.0,
+          "completeness": 0.0
+        },
+        "overallDiff": 0.0,
+        "withinOne": true
+      },
+      "evaluatorA": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "semantic-token-v1",
+        "overall": 5.0
+      },
+      "evaluatorB": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "anchor-pattern-v1",
+        "overall": 5.0
+      },
+      "evidence": [
+        {
+          "claim": "Declares process_transaction_6 at line 3.",
+          "code": "def process_transaction_6(amount: float, fee_rate: float = 0.02) -> float:",
+          "file": "module_6.py",
+          "lineEnd": 3,
+          "lineStart": 3
+        },
+        {
+          "claim": "Code at line 4.",
+          "code": "    \"\"\"Calculate net transaction value for transaction model 6.\"\"\"",
+          "file": "module_6.py",
+          "lineEnd": 4,
+          "lineStart": 4
+        },
+        {
+          "claim": "Conditional control flow at line 5.",
+          "code": "    if amount <= 0.0:",
+          "file": "module_6.py",
+          "lineEnd": 5,
+          "lineStart": 5
+        },
+        {
+          "claim": "Raises an exception at line 6.",
+          "code": "        raise ValueError(\"Transaction amount must be positive\")",
+          "file": "module_6.py",
+          "lineEnd": 6,
+          "lineStart": 6
+        },
+        {
+          "claim": "Code at line 7.",
+          "code": "    fee = amount * fee_rate",
+          "file": "module_6.py",
+          "lineEnd": 7,
+          "lineStart": 7
+        },
+        {
+          "claim": "Code at line 8.",
+          "code": "    net = amount - fee",
+          "file": "module_6.py",
+          "lineEnd": 8,
+          "lineStart": 8
+        }
+      ],
+      "explanation": {
+        "businessRules": "fee = amount * fee_rate; net = amount - fee",
+        "complexity": 2,
+        "controlFlow": "if amount <= 0.0",
+        "dependencies": "ValueError, round",
+        "errorHandling": "raises ValueError; triggered when amount <= 0.0",
+        "inputs": "amount, fee_rate",
+        "outputs": "round(net, 2)",
+        "purpose": "Calculate net transaction value for transaction model 6.",
+        "risks": "Behavior inferred from static analysis; verify against runtime semantics.",
+        "sideEffects": "fee = amount * fee_rate; net = amount - fee"
+      },
       "file": "module_6.py",
-      "grounded": true
+      "function": "process_transaction_6",
+      "grounded": true,
+      "referenceFacts": {
+        "branches": [
+          "amount <= 0.0"
+        ],
+        "errors": [
+          "ValueError when amount <= 0"
+        ],
+        "inputs": [
+          "amount",
+          "fee_rate"
+        ],
+        "outputs": [
+          "net amount rounded to 2 decimals"
+        ],
+        "purpose": [
+          "Calculate the net transaction value after applying a fee"
+        ],
+        "rules": [
+          "fee = amount * fee_rate",
+          "net = amount - fee"
+        ]
+      }
     },
     {
-      "accuracy": 5.0,
-      "clarity": 5.0,
-      "completeness": 5.0,
-      "entity": "process_transaction_7",
-      "evidenceCount": 6,
+      "agreement": {
+        "dimensionDiffs": {
+          "accuracy": 0.0,
+          "clarity": 0.0,
+          "completeness": 0.0
+        },
+        "overallDiff": 0.0,
+        "withinOne": true
+      },
+      "evaluatorA": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "semantic-token-v1",
+        "overall": 5.0
+      },
+      "evaluatorB": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "anchor-pattern-v1",
+        "overall": 5.0
+      },
+      "evidence": [
+        {
+          "claim": "Declares process_transaction_7 at line 3.",
+          "code": "def process_transaction_7(amount: float, fee_rate: float = 0.02) -> float:",
+          "file": "module_7.py",
+          "lineEnd": 3,
+          "lineStart": 3
+        },
+        {
+          "claim": "Code at line 4.",
+          "code": "    \"\"\"Calculate net transaction value for transaction model 7.\"\"\"",
+          "file": "module_7.py",
+          "lineEnd": 4,
+          "lineStart": 4
+        },
+        {
+          "claim": "Conditional control flow at line 5.",
+          "code": "    if amount <= 0.0:",
+          "file": "module_7.py",
+          "lineEnd": 5,
+          "lineStart": 5
+        },
+        {
+          "claim": "Raises an exception at line 6.",
+          "code": "        raise ValueError(\"Transaction amount must be positive\")",
+          "file": "module_7.py",
+          "lineEnd": 6,
+          "lineStart": 6
+        },
+        {
+          "claim": "Code at line 7.",
+          "code": "    fee = amount * fee_rate",
+          "file": "module_7.py",
+          "lineEnd": 7,
+          "lineStart": 7
+        },
+        {
+          "claim": "Code at line 8.",
+          "code": "    net = amount - fee",
+          "file": "module_7.py",
+          "lineEnd": 8,
+          "lineStart": 8
+        }
+      ],
+      "explanation": {
+        "businessRules": "fee = amount * fee_rate; net = amount - fee",
+        "complexity": 2,
+        "controlFlow": "if amount <= 0.0",
+        "dependencies": "ValueError, round",
+        "errorHandling": "raises ValueError; triggered when amount <= 0.0",
+        "inputs": "amount, fee_rate",
+        "outputs": "round(net, 2)",
+        "purpose": "Calculate net transaction value for transaction model 7.",
+        "risks": "Behavior inferred from static analysis; verify against runtime semantics.",
+        "sideEffects": "fee = amount * fee_rate; net = amount - fee"
+      },
       "file": "module_7.py",
-      "grounded": true
+      "function": "process_transaction_7",
+      "grounded": true,
+      "referenceFacts": {
+        "branches": [
+          "amount <= 0.0"
+        ],
+        "errors": [
+          "ValueError when amount <= 0"
+        ],
+        "inputs": [
+          "amount",
+          "fee_rate"
+        ],
+        "outputs": [
+          "net amount rounded to 2 decimals"
+        ],
+        "purpose": [
+          "Calculate the net transaction value after applying a fee"
+        ],
+        "rules": [
+          "fee = amount * fee_rate",
+          "net = amount - fee"
+        ]
+      }
     },
     {
-      "accuracy": 5.0,
-      "clarity": 5.0,
-      "completeness": 5.0,
-      "entity": "process_transaction_8",
-      "evidenceCount": 6,
+      "agreement": {
+        "dimensionDiffs": {
+          "accuracy": 0.0,
+          "clarity": 0.0,
+          "completeness": 0.0
+        },
+        "overallDiff": 0.0,
+        "withinOne": true
+      },
+      "evaluatorA": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "semantic-token-v1",
+        "overall": 5.0
+      },
+      "evaluatorB": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "anchor-pattern-v1",
+        "overall": 5.0
+      },
+      "evidence": [
+        {
+          "claim": "Declares process_transaction_8 at line 3.",
+          "code": "def process_transaction_8(amount: float, fee_rate: float = 0.02) -> float:",
+          "file": "module_8.py",
+          "lineEnd": 3,
+          "lineStart": 3
+        },
+        {
+          "claim": "Code at line 4.",
+          "code": "    \"\"\"Calculate net transaction value for transaction model 8.\"\"\"",
+          "file": "module_8.py",
+          "lineEnd": 4,
+          "lineStart": 4
+        },
+        {
+          "claim": "Conditional control flow at line 5.",
+          "code": "    if amount <= 0.0:",
+          "file": "module_8.py",
+          "lineEnd": 5,
+          "lineStart": 5
+        },
+        {
+          "claim": "Raises an exception at line 6.",
+          "code": "        raise ValueError(\"Transaction amount must be positive\")",
+          "file": "module_8.py",
+          "lineEnd": 6,
+          "lineStart": 6
+        },
+        {
+          "claim": "Code at line 7.",
+          "code": "    fee = amount * fee_rate",
+          "file": "module_8.py",
+          "lineEnd": 7,
+          "lineStart": 7
+        },
+        {
+          "claim": "Code at line 8.",
+          "code": "    net = amount - fee",
+          "file": "module_8.py",
+          "lineEnd": 8,
+          "lineStart": 8
+        }
+      ],
+      "explanation": {
+        "businessRules": "fee = amount * fee_rate; net = amount - fee",
+        "complexity": 2,
+        "controlFlow": "if amount <= 0.0",
+        "dependencies": "ValueError, round",
+        "errorHandling": "raises ValueError; triggered when amount <= 0.0",
+        "inputs": "amount, fee_rate",
+        "outputs": "round(net, 2)",
+        "purpose": "Calculate net transaction value for transaction model 8.",
+        "risks": "Behavior inferred from static analysis; verify against runtime semantics.",
+        "sideEffects": "fee = amount * fee_rate; net = amount - fee"
+      },
       "file": "module_8.py",
-      "grounded": true
+      "function": "process_transaction_8",
+      "grounded": true,
+      "referenceFacts": {
+        "branches": [
+          "amount <= 0.0"
+        ],
+        "errors": [
+          "ValueError when amount <= 0"
+        ],
+        "inputs": [
+          "amount",
+          "fee_rate"
+        ],
+        "outputs": [
+          "net amount rounded to 2 decimals"
+        ],
+        "purpose": [
+          "Calculate the net transaction value after applying a fee"
+        ],
+        "rules": [
+          "fee = amount * fee_rate",
+          "net = amount - fee"
+        ]
+      }
     },
     {
-      "accuracy": 5.0,
-      "clarity": 5.0,
-      "completeness": 5.0,
-      "entity": "process_transaction_9",
-      "evidenceCount": 6,
+      "agreement": {
+        "dimensionDiffs": {
+          "accuracy": 0.0,
+          "clarity": 0.0,
+          "completeness": 0.0
+        },
+        "overallDiff": 0.0,
+        "withinOne": true
+      },
+      "evaluatorA": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "semantic-token-v1",
+        "overall": 5.0
+      },
+      "evaluatorB": {
+        "accuracy": 5.0,
+        "categoryMatch": {
+          "branches": true,
+          "errors": true,
+          "inputs": true,
+          "outputs": true,
+          "purpose": true,
+          "rules": true
+        },
+        "clarity": 5.0,
+        "completeness": 5.0,
+        "factsCovered": 6,
+        "name": "anchor-pattern-v1",
+        "overall": 5.0
+      },
+      "evidence": [
+        {
+          "claim": "Declares process_transaction_9 at line 3.",
+          "code": "def process_transaction_9(amount: float, fee_rate: float = 0.02) -> float:",
+          "file": "module_9.py",
+          "lineEnd": 3,
+          "lineStart": 3
+        },
+        {
+          "claim": "Code at line 4.",
+          "code": "    \"\"\"Calculate net transaction value for transaction model 9.\"\"\"",
+          "file": "module_9.py",
+          "lineEnd": 4,
+          "lineStart": 4
+        },
+        {
+          "claim": "Conditional control flow at line 5.",
+          "code": "    if amount <= 0.0:",
+          "file": "module_9.py",
+          "lineEnd": 5,
+          "lineStart": 5
+        },
+        {
+          "claim": "Raises an exception at line 6.",
+          "code": "        raise ValueError(\"Transaction amount must be positive\")",
+          "file": "module_9.py",
+          "lineEnd": 6,
+          "lineStart": 6
+        },
+        {
+          "claim": "Code at line 7.",
+          "code": "    fee = amount * fee_rate",
+          "file": "module_9.py",
+          "lineEnd": 7,
+          "lineStart": 7
+        },
+        {
+          "claim": "Code at line 8.",
+          "code": "    net = amount - fee",
+          "file": "module_9.py",
+          "lineEnd": 8,
+          "lineStart": 8
+        }
+      ],
+      "explanation": {
+        "businessRules": "fee = amount * fee_rate; net = amount - fee",
+        "complexity": 2,
+        "controlFlow": "if amount <= 0.0",
+        "dependencies": "ValueError, round",
+        "errorHandling": "raises ValueError; triggered when amount <= 0.0",
+        "inputs": "amount, fee_rate",
+        "outputs": "round(net, 2)",
+        "purpose": "Calculate net transaction value for transaction model 9.",
+        "risks": "Behavior inferred from static analysis; verify against runtime semantics.",
+        "sideEffects": "fee = amount * fee_rate; net = amount - fee"
+      },
       "file": "module_9.py",
-      "grounded": true
+      "function": "process_transaction_9",
+      "grounded": true,
+      "referenceFacts": {
+        "branches": [
+          "amount <= 0.0"
+        ],
+        "errors": [
+          "ValueError when amount <= 0"
+        ],
+        "inputs": [
+          "amount",
+          "fee_rate"
+        ],
+        "outputs": [
+          "net amount rounded to 2 decimals"
+        ],
+        "purpose": [
+          "Calculate the net transaction value after applying a fee"
+        ],
+        "rules": [
+          "fee = amount * fee_rate",
+          "net = amount - fee"
+        ]
+      }
     }
   ],
   "platform": "Windows-10-10.0.26200-SP0",
   "python": "3.11.15",
-  "recordedAt": "2026-08-14T03:43:50Z",
+  "recordedAt": "2026-08-14T04:22:52Z",
   "target": {
+    "groundingPctMin": 100.0,
     "overallMin": 4.0
   }
 }

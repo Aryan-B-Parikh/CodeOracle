@@ -155,6 +155,76 @@ def _is_local_call(name: str, local_names: set[str]) -> bool:
     return name in local_names or name.rsplit(".", 1)[-1] in local_names
 
 
+_MAX_FACTS = 10
+
+
+def _unparse_safe(node: ast.AST | None) -> str | None:
+    if node is None:
+        return None
+    try:
+        text = ast.unparse(node).strip()
+    except Exception:
+        return None
+    return text if len(text) <= 200 else None
+
+
+def _semantic_facts(node: EntityNode) -> dict[str, object]:
+    """Extract semantic facts from a function body (raises, assignments,
+    branch conditions, return values) via ast.unparse — never source dumps.
+
+    Deterministic and pure; feeds evidence-grounded explanations and tests.
+    """
+
+    def walk(current: ast.AST) -> Iterator[ast.AST]:
+        for child in ast.iter_child_nodes(current):
+            if _is_nested_def(child):
+                continue
+            yield child
+            yield from walk(child)
+
+    raises: list[str] = []
+    assignments: list[str] = []
+    branches: list[str] = []
+    returns: list[str] = []
+
+    for child in walk(node):
+        if isinstance(child, ast.Raise):
+            exc = child.exc
+            if isinstance(exc, ast.Call) and isinstance(exc.func, ast.Name):
+                raises.append(exc.func.id)
+            elif isinstance(exc, ast.Name):
+                raises.append(exc.id)
+            elif exc is None:
+                raises.append("re-raise")
+        elif isinstance(child, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+            if isinstance(child, ast.Assign):
+                for assign_target in child.targets:
+                    target_text = _unparse_safe(assign_target)
+                    value_text = _unparse_safe(child.value)
+                    if target_text and value_text:
+                        assignments.append(f"{target_text} = {value_text}")
+            elif isinstance(child, (ast.AnnAssign, ast.AugAssign)):
+                target_text = _unparse_safe(child.target)
+                value_text = _unparse_safe(child.value)
+                if target_text and value_text:
+                    assignments.append(f"{target_text} = {value_text}")
+        elif isinstance(child, (ast.If, ast.While)):
+            condition = _unparse_safe(child.test)
+            if condition:
+                branches.append(condition)
+        elif isinstance(child, ast.Return):
+            value = _unparse_safe(child.value)
+            if value:
+                returns.append(value)
+
+    return {
+        "raises": raises[:_MAX_FACTS],
+        "assignments": assignments[:_MAX_FACTS],
+        "branches": branches[:_MAX_FACTS],
+        "returns": returns[:_MAX_FACTS],
+    }
+
+
 def _collect_imports(node: EntityNode | ast.Module) -> list[ImportRef]:
     result: list[ImportRef] = []
 
@@ -244,6 +314,11 @@ def parse_python(source: str, path: str) -> ParsedFile:
                 calls=_collect_calls(node, local_names),
                 imports=_collect_imports(node),
                 inheritances=inheritances,
+                metadata=(
+                    _semantic_facts(node)
+                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                    else {}
+                ),
             )
         )
 

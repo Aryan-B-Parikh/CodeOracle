@@ -1,0 +1,166 @@
+{
+  "_schema": "explanation-benchmark-facts-v1",
+  "_description": "Ground-truth facts for the 20 generated process_transaction_N functions used by test_explanation_quality.py. Each entry is the reference a CodeOracle explanation is judged against.",
+  "functions": {
+    "process_transaction_1": {
+      "purpose": ["Calculate the net transaction value after applying a fee"],
+      "inputs": ["amount", "fee_rate"],
+      "outputs": ["net amount rounded to 2 decimals"],
+      "errors": ["ValueError when amount <= 0"],
+      "rules": ["fee = amount * fee_rate", "net = amount - fee"],
+      "branches": ["amount <= 0.0"]
+    },
+    "process_transaction_2": {
+      "purpose": ["Calculate the net transaction value after applying a fee"],
+      "inputs": ["amount", "fee_rate"],
+      "outputs": ["net amount rounded to 2 decimals"],
+      "errors": ["ValueError when amount <= 0"],
+      "rules": ["fee = amount * fee_rate", "net = amount - fee"],
+      "branches": ["amount <= 0.0"]
+    },
+    "process_transaction_3": {
+      "purpose": ["Calculate the net transaction value after applying a fee"],
+      "inputs": ["amount", "fee_rate"],
+      "outputs": ["net amount rounded to 2 decimals"],
+      "errors": ["ValueError when amount <= 0"],
+      "rules": ["fee = amount * fee_rate", "net = amount - fee"],
+      "branches": ["amount <= 0.0"]
+    },
+    "process_transaction_4": {
+      "purpose": ["Calculate the net transaction value after applying a fee"],
+      "inputs": ["amount", "fee_rate"],
+      "outputs": ["net amount rounded to 2 decimals"],
+      "errors": ["ValueError when amount <= 0"],
+      "rules": ["fee = amount * fee_rate", "net = amount - fee"],
+      "branches": ["amount <= 0.0"]
+    },
+    "process_transaction_5": {
+      "purpose": ["Calculate the net transaction value after applying a fee"],
+      "inputs": ["amount", "fee_rate"],
+      "outputs": ["net amount rounded to 2 decimals"],
+      "errors": ["ValueError when amount <= 0"],
+      "rules": ["fee = amount * fee_rate", "net = amount - fee"],
+      "branches": ["amount <= 0.0"]
+    },
+    "process_transaction_6": {
+      "purpose": ["Calculate the net transaction value after applying a fee"],
+      "inputs": ["amount", "fee_rate"],
+      "outputs": ["net amount rounded to 2 decimals"],
+      "errors": ["ValueError when amount <= 0"],
+      "rules": ["fee = amount * fee_rate", "net = amount - fee"],
+      "branches": ["amount <= 0.0"]
+    },
+    "process_transaction_7": {
+      "purpose": ["Calculate the net transaction value after applying a fee"],
+      "inputs": ["amount", "fee_rate"],
+      "outputs": ["net amount rounded to 2 decimals"],
+      "errors": ["ValueError when amount <= 0"],
+      "rules": ["fee = amount * fee_rate", "net = amount - fee"],
+      "branches": ["amount <= 0.0"]
+    },
+    "process_transaction_8": {
+      "purpose": ["Calculate the net transaction value after applying a fee"],
+      "inputs": ["amount", "fee_rate"],
+      "outputs": ["net amount rounded to 2 decimals"],
+      "errors": ["ValueError when amount <= 0"],
+      "rules": ["fee = amount * fee_rate", "net = amount - fee"],
+      "branches": ["amount <= 0.0"]
+    },
+    "process_transaction_9": {
+      "purpose": ["Calculate the net transaction value after applying a fee"],
+      "inputs": ["amount", "fee_rate"],
+      "outputs": ["net amount rounded to 2 decimals"],
+      "errors": ["ValueError when amount <= 0"],
+      "rules": ["fee = amount * fee_rate", "net = amount - fee"],
+      "branches": ["amount <= 0.0"]
+    },
+    "process_transaction_10": {
+      "purpose": ["Calculate the net transaction value after applying a fee"],
+      "inputs": ["amount", "fee_rate"],
+      "outputs": ["net amount rounded to 2 decimals"],
+      "errors": ["ValueError when amount <= 0"],
+      "rules": ["fee = amount * fee_rate", "net = amount - fee"],
+      "branches": ["amount <= 0.0"]
+    },
+    "process_transaction_11": {
+      "purpose": ["Calculate the net transaction value after applying a fee"],
+      "inputs": ["amount", "fee_rate"],
+      "outputs": ["net amount rounded to 2 decimals"],
+      "errors": ["ValueError when amount <= 0"],
+      "rules": ["fee = amount * fee_rate", "net = amount - fee"],
+      "branches": ["amount <= 0.0"]
+    },
+    "process_transaction_12": {
+      "purpose": ["Calculate the net transaction value after applying a fee"],
+      "inputs": ["amount", "fee_rate"],
+      "outputs": ["net amount rounded to 2 decimals"],
+      "errors": ["ValueError when amount <= 0"],
+      "rules": ["fee = amount * fee_rate", "net = amount - fee"],
+      "branches": ["amount <= 0.0"]
+    },
+    "process_transaction_13": {
+      "purpose": ["Calculate the net transaction value after applying a fee"],
+      "inputs": ["amount", "fee_rate"],
+      "outputs": ["net amount rounded to 2 decimals"],
+      "errors": ["ValueError when amount <= 0"],
+      "rules": ["fee = amount * fee_rate", "net = amount - fee"],
+      "branches": ["amount <= 0.0"]
+    },
+    "process_transaction_14": {
+      "purpose": ["Calculate the net transaction value after applying a fee"],
+      "inputs": ["amount", "fee_rate"],
+      "outputs": ["net amount rounded to 2 decimals"],
+      "errors": ["ValueError when amount <= 0"],
+      "rules": ["fee = amount * fee_rate", "net = amount - fee"],
+      "branches": ["amount <= 0.0"]
+    },
+    "process_transaction_15": {
+      "purpose": ["Calculate the net transaction value after applying a fee"],
+      "inputs": ["amount", "fee_rate"],
+      "outputs": ["net amount rounded to 2 decimals"],
+      "errors": ["ValueError when amount <= 0"],
+      "rules": ["fee = amount * fee_rate", "net = amount - fee"],
+      "branches": ["amount <= 0.0"]
+    },
+    "process_transaction_16": {
+      "purpose": ["Calculate the net transaction value after applying a fee"],
+      "inputs": ["amount", "fee_rate"],
+      "outputs": ["net amount rounded to 2 decimals"],
+      "errors": ["ValueError when amount <= 0"],
+      "rules": ["fee = amount * fee_rate", "net = amount - fee"],
+      "branches": ["amount <= 0.0"]
+    },
+    "process_transaction_17": {
+      "purpose": ["Calculate the net transaction value after applying a fee"],
+      "inputs": ["amount", "fee_rate"],
+      "outputs": ["net amount rounded to 2 decimals"],
+      "errors": ["ValueError when amount <= 0"],
+      "rules": ["fee = amount * fee_rate", "net = amount - fee"],
+      "branches": ["amount <= 0.0"]
+    },
+    "process_transaction_18": {
+      "purpose": ["Calculate the net transaction value after applying a fee"],
+      "inputs": ["amount", "fee_rate"],
+      "outputs": ["net amount rounded to 2 decimals"],
+      "errors": ["ValueError when amount <= 0"],
+      "rules": ["fee = amount * fee_rate", "net = amount - fee"],
+      "branches": ["amount <= 0.0"]
+    },
+    "process_transaction_19": {
+      "purpose": ["Calculate the net transaction value after applying a fee"],
+      "inputs": ["amount", "fee_rate"],
+      "outputs": ["net amount rounded to 2 decimals"],
+      "errors": ["ValueError when amount <= 0"],
+      "rules": ["fee = amount * fee_rate", "net = amount - fee"],
+      "branches": ["amount <= 0.0"]
+    },
+    "process_transaction_20": {
+      "purpose": ["Calculate the net transaction value after applying a fee"],
+      "inputs": ["amount", "fee_rate"],
+      "outputs": ["net amount rounded to 2 decimals"],
+      "errors": ["ValueError when amount <= 0"],
+      "rules": ["fee = amount * fee_rate", "net = amount - fee"],
+      "branches": ["amount <= 0.0"]
+    }
+  }
+}

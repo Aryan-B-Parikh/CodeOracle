@@ -1,20 +1,28 @@
-"""Requirement 8: Automated Explanation Quality Benchmark.
+"""Requirement 8: Semantic, reference-based Explanation Quality Benchmark.
 
-Evaluates CodeOracle explanations across 20 known legacy functions against:
-  - Clarity (structure, concise language, clear risk assessment)
-  - Accuracy (verifiable evidence lines, AST signature fidelity)
-  - Completeness (business rules, error handling, dependencies)
+Pipeline (no self-grading):
 
-Scoring is produced by a DETERMINISTIC rubric (judge = "deterministic-rubric-v1")
-that evaluates the structured explanation fields and the post-generation
-evidence validator (app/services/explanation.py::validate_evidence_items).
-There is no opaque external judge: every 1-5 component score is computed from
-checkable data, and the full per-function breakdown is recorded to
-benchmark-results/explanation_quality.json so any score is auditable and
-bit-for-bit reproducible in CI (mock provider) or against any real provider.
+  Known ground truth (fixture JSON, 20 functions)
+        |
+        v
+  CodeOracle explanation (explain_entity, production service)
+        |
+        v
+  two INDEPENDENT deterministic evaluators (explanation_eval.py)
+        |
+        v
+  score per function (accuracy / completeness / clarity / overall)
+        |
+        v
+  evidence (post-generation evidence validator output)
 
-Asserts that overall score >= 4.0 / 5.0 and that every cited evidence item is
-grounded in a real repository file within valid line bounds.
+Reports: Grounding %, Factual accuracy, Completeness, Clarity, Overall and
+evaluator agreement. Every score is auditable: the full per-function record
+(explanation fields, reference facts, both evaluator results, agreement,
+evidence citations) is written to benchmark-results/explanation_quality.json.
+
+The deterministic evidence validator (validate_evidence_items) remains the
+grounding gate and is asserted separately (100% grounded, in-bounds citations).
 """
 
 from __future__ import annotations
@@ -31,10 +39,19 @@ from app.db.models.repository import Repository
 from app.db.session import SessionLocal
 from app.services.analysis import analyze_repository
 from app.services.explanation import explain_entity
+from app.services.explanation_eval import evaluate_pair
 from fastapi.testclient import TestClient
 from tests.benchmark_report import write_artifact
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
+FACTS_FILE = FIXTURES / "explanation_benchmark_facts.json"
+
+
+def _load_ground_truth() -> dict[str, dict[str, list[str]]]:
+    """Load the reference facts: function name -> {purpose, inputs, outputs,
+    errors, rules, branches}."""
+    raw = json.loads(FACTS_FILE.read_text(encoding="utf-8"))
+    return raw["functions"]
 
 
 def _generate_explanation_benchmark_zip() -> bytes:
@@ -57,7 +74,10 @@ def process_transaction_{m}(amount: float, fee_rate: float = 0.02) -> float:
 
 
 def test_explanation_quality_benchmark(client: TestClient) -> None:
-    """Benchmark explanation engine quality across 20 known domain functions."""
+    """Benchmark explanation quality against reference facts (no self-grading)."""
+    ground_truth = _load_ground_truth()
+    assert len(ground_truth) == 20, f"Expected 20 ground-truth entries, got {len(ground_truth)}"
+
     zip_bytes = _generate_explanation_benchmark_zip()
 
     upload_resp = client.post(
@@ -79,88 +99,132 @@ def test_explanation_quality_benchmark(client: TestClient) -> None:
         )
         assert len(entities) >= 20
 
-        clarity_scores: list[float] = []
-        accuracy_scores: list[float] = []
-        completeness_scores: list[float] = []
-        per_function: list[dict] = []
-
         repo_file_paths = {
             f.path for f in db.query(File).filter(File.repository_id == repo_id).all()
         }
 
+        # Grounding gate (deterministic evidence validator, kept).
+        total_evidence = 0
+        grounded_functions = 0
+        per_function: list[dict] = []
+
         for entity in entities[:20]:
+            name = entity.name
+            facts = ground_truth[name]
+
             explanation_data = explain_entity(db, repository, entity)
-
-            # 1. Clarity Evaluation: structured fields present
-            has_purpose = bool(explanation_data.explanation.purpose)
-            has_risks = bool(explanation_data.explanation.risks)
-            clarity = 5.0 if (has_purpose and has_risks) else 3.0
-            clarity_scores.append(clarity)
-
-            # 2. Accuracy Evaluation: evidence grounded with valid file + line bounds
+            explanation = explanation_data.explanation
             evidence = explanation_data.evidence
+
+            # Evidence validator must have kept citations, all grounded in real
+            # files with in-bounds line ranges.
+            assert evidence, f"Explanation for {name} has no evidence after validation"
             grounded = all(
                 ev.file in repo_file_paths
                 and entity.line_start <= ev.line_start <= ev.line_end <= entity.line_end
                 for ev in evidence
-            ) if evidence else False
-            accuracy = 5.0 if grounded else 2.0
-            accuracy_scores.append(accuracy)
-
-            # 3. Completeness Evaluation: inputs, outputs, error handling detailed
-            has_inputs = bool(explanation_data.explanation.inputs)
-            has_outputs = bool(explanation_data.explanation.outputs)
-            has_errors = bool(explanation_data.explanation.error_handling)
-            completeness = 5.0 if (has_inputs and has_outputs and has_errors) else 3.0
-            completeness_scores.append(completeness)
-
-            # Deterministic grounding: the evidence validator must have kept at
-            # least one citation for every explained function.
-            assert evidence, (
-                f"Explanation for {entity.name} has no evidence after validation"
             )
             assert grounded, (
-                f"Explanation for {entity.name} cites out-of-bounds or unknown files: "
+                f"Explanation for {name} cites out-of-bounds or unknown files: "
                 f"{[(ev.file, ev.line_start, ev.line_end) for ev in evidence]}"
             )
+            grounded_functions += 1
+            total_evidence += len(evidence)
+
+            # Independent dual evaluation against reference facts.
+            result = evaluate_pair(explanation, facts)
 
             per_function.append(
                 {
-                    "entity": entity.name,
+                    "function": name,
                     "file": entity.file.path if entity.file else None,
-                    "evidenceCount": len(evidence),
+                    "referenceFacts": facts,
+                    "explanation": {
+                        "purpose": explanation.purpose,
+                        "inputs": explanation.inputs,
+                        "outputs": explanation.outputs,
+                        "sideEffects": explanation.side_effects,
+                        "dependencies": explanation.dependencies,
+                        "controlFlow": explanation.control_flow,
+                        "errorHandling": explanation.error_handling,
+                        "businessRules": explanation.business_rules,
+                        "complexity": explanation.complexity,
+                        "risks": explanation.risks,
+                    },
+                    "evidence": [
+                        {
+                            "claim": ev.claim,
+                            "file": ev.file,
+                            "lineStart": ev.line_start,
+                            "lineEnd": ev.line_end,
+                            "code": ev.code,
+                        }
+                        for ev in evidence
+                    ],
                     "grounded": grounded,
-                    "clarity": clarity,
-                    "accuracy": accuracy,
-                    "completeness": completeness,
+                    "evaluatorA": result["evaluatorA"],
+                    "evaluatorB": result["evaluatorB"],
+                    "agreement": result["agreement"],
                 }
             )
 
-        avg_clarity = round(sum(clarity_scores) / len(clarity_scores), 2)
-        avg_accuracy = round(sum(accuracy_scores) / len(accuracy_scores), 2)
-        avg_completeness = round(sum(completeness_scores) / len(completeness_scores), 2)
-        overall_score = round(
-            (avg_clarity + avg_accuracy + avg_completeness) / 3.0, 2
+        grounding_pct = round(100.0 * grounded_functions / len(per_function), 2)
+
+        def avg(key: str) -> float:
+            return round(
+                sum(
+                    (pf["evaluatorA"][key] + pf["evaluatorB"][key]) / 2.0
+                    for pf in per_function
+                )
+                / len(per_function),
+                2,
+            )
+
+        accuracy = avg("accuracy")
+        completeness = avg("completeness")
+        clarity = avg("clarity")
+        overall = round((accuracy + completeness + clarity) / 3.0, 2)
+
+        within_one = sum(1 for pf in per_function if pf["agreement"]["withinOne"])
+        exact = sum(
+            1
+            for pf in per_function
+            if pf["evaluatorA"]["overall"] == pf["evaluatorB"]["overall"]
         )
+        agreement_within_one_pct = round(100.0 * within_one / len(per_function), 2)
+        agreement_exact_pct = round(100.0 * exact / len(per_function), 2)
 
         print(
             f"\n[EXPLANATION QUALITY BENCHMARK REPORT]\n"
-            f"Clarity: {avg_clarity}/5.0 | Accuracy: {avg_accuracy}/5.0 | "
-            f"Completeness: {avg_completeness}/5.0 | Overall: {overall_score}/5.0 (Target >= 4.0)"
+            f"Grounding:       {grounding_pct}% "
+            f"({grounded_functions}/{len(per_function)} functions, {total_evidence} citations)\n"
+            f"Factual accuracy: {accuracy}/5.0\n"
+            f"Completeness:     {completeness}/5.0\n"
+            f"Clarity:          {clarity}/5.0\n"
+            f"Overall:          {overall}/5.0\n"
+            f"Evaluator agreement: {agreement_exact_pct}% exact / "
+            f"{agreement_within_one_pct}% within 1.0"
         )
 
         # Record the auditable per-function scoring artifact (also uploaded from CI).
         artifact = write_artifact(
             "explanation_quality",
             {
-                "benchmark": "explanation-quality-20-functions",
-                "judge": "deterministic-rubric-v1",
+                "benchmark": "explanation-quality-reference-based",
+                "judge": "dual-deterministic-evaluators",
                 "judgeProvider": explanation_data.provider,
-                "clarity": avg_clarity,
-                "accuracy": avg_accuracy,
-                "completeness": avg_completeness,
-                "overall": overall_score,
-                "target": {"overallMin": 4.0},
+                "groundTruth": "explanation_benchmark_facts.json",
+                "groundingPct": grounding_pct,
+                "factualAccuracy": accuracy,
+                "completeness": completeness,
+                "clarity": clarity,
+                "overall": overall,
+                "target": {"overallMin": 4.0, "groundingPctMin": 100.0},
+                "evaluatorAgreement": {
+                    "exactPct": agreement_exact_pct,
+                    "withinOnePct": agreement_within_one_pct,
+                    "minWithinOnePct": 80.0,
+                },
                 "functionsEvaluated": len(per_function),
                 "perFunction": per_function,
                 "pass": True,
@@ -168,11 +232,20 @@ def test_explanation_quality_benchmark(client: TestClient) -> None:
         )
         print(f"Artifact={artifact}")
 
-        # Requirement 8 Assertion
-        assert overall_score >= 4.0, f"Explanation quality below 4.0/5.0: {overall_score}"
-        assert overall_score <= 5.0, f"Invalid score above 5.0: {overall_score}"
+        # Requirement 8 Assertions (honest floors; 5.0 requires every ground-truth
+        # fact to be stated, grounded and clear under both evaluators).
+        assert grounding_pct == 100.0, f"Grounding below 100%: {grounding_pct}%"
+        assert agreement_within_one_pct >= 80.0, (
+            f"Evaluator agreement below 80% within 1.0: {agreement_within_one_pct}%"
+        )
+        assert 0.0 <= overall <= 5.0, f"Invalid score: {overall}"
+        assert overall >= 4.0, (
+            f"Explanation quality below 4.0/5.0: {overall} "
+            f"(accuracy={accuracy}, completeness={completeness}, clarity={clarity})"
+        )
         with artifact.open(encoding="utf-8") as fh:
             recorded = json.load(fh)
-        assert (
-            recorded["overall"] == overall_score
-        ), "Recorded artifact diverges from measured score"
+        assert recorded["overall"] == overall, "Recorded artifact diverges from measured score"
+        assert recorded["groundingPct"] == grounding_pct, (
+            "Recorded artifact diverges from measured grounding"
+        )

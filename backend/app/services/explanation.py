@@ -106,6 +106,72 @@ def _extract_evidence_from_snippet(
     return evidence
 
 
+def _semantic_explanation(
+    entity: Entity, rel_path: str, meta: dict, calls_made: list[Call]
+) -> ExplanationFields:
+    """Deterministic AST-fact explanation: purpose/docstring, arguments,
+    assignments as business rules, branch conditions, raise statements and
+    return values — every claim is a static fact, never invented text."""
+
+    arguments = meta.get("arguments", [])
+    deps = [c.callee_name for c in calls_made]
+    raises = meta.get("raises", [])
+    assignments = meta.get("assignments", [])
+    branches = meta.get("branches", [])
+    returns = meta.get("returns", [])
+
+    purpose = (entity.docstring or "").strip()
+    if not purpose:
+        purpose = f"Performs the {entity.type} '{entity.name}' logic."
+
+    inputs = ", ".join(str(a) for a in arguments) if arguments else "None"
+    outputs = (
+        ", ".join(str(r) for r in returns)
+        if returns
+        else (meta.get("return_type") or "Value or None")
+    )
+    side_effects = (
+        "; ".join(str(a) for a in assignments[:4])
+        if assignments
+        else "None detected from static analysis."
+    )
+    dependencies = ", ".join(deps) if deps else "None (leaf function)"
+    control_flow = (
+        "; ".join(f"if {b}" for b in branches[:4])
+        if branches
+        else "Control flow as structured in the source (see evidence)."
+    )
+    error_handling = (
+        "; ".join(f"raises {r}" for r in raises[:4])
+        if raises
+        else "Propagates exceptions or relies on callee error semantics."
+    )
+    if raises and branches:
+        error_handling += f"; triggered when {branches[0]}"
+    business_rules = (
+        "; ".join(str(a) for a in assignments[:4])
+        if assignments
+        else (
+            f"Business logic implemented by {entity.name} per source "
+            f"lines {entity.line_start}-{entity.line_end}."
+        )
+    )
+    risks = "Behavior inferred from static analysis; verify against runtime semantics."
+
+    return ExplanationFields(
+        purpose=purpose,
+        inputs=inputs,
+        outputs=outputs,
+        side_effects=side_effects,
+        dependencies=dependencies,
+        control_flow=control_flow,
+        error_handling=error_handling,
+        business_rules=business_rules,
+        complexity=entity.complexity,
+        risks=risks,
+    )
+
+
 def explain_entity(
     db: Session, repository: Repository, entity: Entity
 ) -> ExplanationData:
@@ -165,6 +231,10 @@ def generate_explanation(
         "return_type": meta.get("return_type"),
         "calls": meta.get("calls", []),
         "globals_used": meta.get("globals_used", []),
+        "raises": meta.get("raises", []),
+        "assignments": meta.get("assignments", []),
+        "branches": meta.get("branches", []),
+        "returns": meta.get("returns", []),
     }
 
     entity_json = json.dumps(
@@ -200,6 +270,7 @@ def generate_explanation(
 
     explanation_fields: ExplanationFields
     evidence_items: list[EvidenceItem] = []
+    semantic = _semantic_explanation(entity, rel_path, meta, calls_made)
 
     if has_real_llm:
         try:
@@ -250,28 +321,23 @@ def generate_explanation(
             risks = str(exp_dict.get("risks") or exp_dict.get("10. Risks") or "").strip()
 
             if not purpose:
-                purpose = f"Performs the {entity.type} '{entity.name}' logic."
+                purpose = semantic.purpose
             if not inputs:
-                args = meta.get("arguments", [])
-                inputs = ", ".join(str(a) for a in args) if args else "None"
+                inputs = semantic.inputs
             if not outputs:
-                outputs = meta.get("return_type") or "Value or None"
+                outputs = semantic.outputs
             if not side_effects:
-                side_effects = "None detected from static analysis."
+                side_effects = semantic.side_effects
             if not dependencies:
-                deps = [c.callee_name for c in calls_made]
-                dependencies = ", ".join(deps) if deps else "None (leaf function)"
+                dependencies = semantic.dependencies
             if not control_flow:
-                control_flow = "Control flow as structured in the source (see evidence)."
+                control_flow = semantic.control_flow
             if not error_handling:
-                error_handling = "Propagates exceptions to the caller."
+                error_handling = semantic.error_handling
             if not business_rules:
-                business_rules = (
-                    f"Business logic implemented by {entity.name} per source "
-                    f"lines {entity.line_start}-{entity.line_end}."
-                )
+                business_rules = semantic.business_rules
             if not risks:
-                risks = "Behavior inferred from static analysis; verify at runtime."
+                risks = semantic.risks
 
             explanation_fields = ExplanationFields(
                 purpose=purpose,
@@ -311,41 +377,11 @@ def generate_explanation(
                         )
         except Exception as exc:
             logger.info("LLM gateway JSON extraction fallback: %s", exc)
-            arguments = meta.get("arguments", [])
-            deps = [c.callee_name for c in calls_made]
-            explanation_fields = ExplanationFields(
-                purpose=f"Performs the {entity.type} '{entity.name}' logic.",
-                inputs=", ".join(str(a) for a in arguments) if arguments else "None",
-                outputs=meta.get("return_type") or "Any",
-                side_effects="None detected from static analysis.",
-                dependencies=", ".join(deps) if deps else "None (leaf function)",
-                control_flow="Standard control flow.",
-                error_handling="Propagates exceptions.",
-                business_rules=f"Applies business rules for {entity.name}.",
-                complexity=entity.complexity,
-                risks="Low risk.",
+            explanation_fields = _semantic_explanation(
+                entity, rel_path, meta, calls_made
             )
     else:
-        arguments = meta.get("arguments", [])
-        deps = [c.callee_name for c in calls_made]
-        explanation_fields = ExplanationFields(
-            purpose=(
-                f"Performs the {entity.type} '{entity.name}' logic at "
-                f"{rel_path}:{entity.line_start}-{entity.line_end}."
-            ),
-            inputs=", ".join(str(a) for a in arguments) if arguments else "None",
-            outputs=meta.get("return_type") or "Any",
-            side_effects="None detected from static analysis.",
-            dependencies=", ".join(deps) if deps else "None (leaf function)",
-            control_flow="Control flow as structured in the source (see evidence).",
-            error_handling="Propagates exceptions or relies on callee error semantics.",
-            business_rules=(
-                f"Business logic implemented by {entity.name} per source "
-                f"lines {entity.line_start}-{entity.line_end}."
-            ),
-            complexity=entity.complexity,
-            risks="Behavior inferred from static analysis; verify against runtime semantics.",
-        )
+        explanation_fields = _semantic_explanation(entity, rel_path, meta, calls_made)
 
     if not evidence_items:
         evidence_items = _extract_evidence_from_snippet(
