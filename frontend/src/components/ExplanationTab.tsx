@@ -312,7 +312,7 @@ export function ExplanationTab({
                 </div>
 
                 <div style={styles.citationList}>
-                  {explanation.evidence.map((item, idx) => (
+                  {(explanation.evidence || []).map((item, idx) => (
                     <div
                       key={idx}
                       onClick={() => setActiveCitationIndex(activeCitationIndex === idx ? null : idx)}
@@ -370,42 +370,51 @@ export function ExplanationTab({
 
                 <div style={styles.impactColumns}>
                   {/* Callers (Fan-in) */}
-                  <div style={styles.impactColumn}>
-                    <h4 style={styles.columnHeading}>
-                      Callers (Fan-In: {impact.callers.length})
-                    </h4>
-                    {impact.callers.length === 0 ? (
-                      <div style={styles.emptyListNotice}>No internal callers found (potential entry point)</div>
-                    ) : (
-                      <div style={styles.impactList}>
-                        {impact.callers.map((c, i) => (
-                          <div key={i} style={styles.impactListItem}>
-                            <span style={styles.impactCallerName}>{c.caller}</span>
-                            <span style={styles.impactLocation}>{c.file}:L{c.callLine}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  {/* Callers (Fan-in) */}
+                  {(() => {
+                    const callers = impact.callers || []
+                    const callees = impact.callees || []
+                    return (
+                      <>
+                        <div style={styles.impactColumn}>
+                          <h4 style={styles.columnHeading}>
+                            Callers (Fan-In: {callers.length})
+                          </h4>
+                          {callers.length === 0 ? (
+                            <div style={styles.emptyListNotice}>No internal callers found (potential entry point)</div>
+                          ) : (
+                            <div style={styles.impactList}>
+                              {callers.map((c, i) => (
+                                <div key={i} style={styles.impactListItem}>
+                                  <span style={styles.impactCallerName}>{c.caller}</span>
+                                  <span style={styles.impactLocation}>{c.file}:L{c.callLine}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
 
-                  {/* Callees (Fan-out) */}
-                  <div style={styles.impactColumn}>
-                    <h4 style={styles.columnHeading}>
-                      Callees (Fan-Out: {impact.callees.length})
-                    </h4>
-                    {impact.callees.length === 0 ? (
-                      <div style={styles.emptyListNotice}>Leaf function (no downstream calls)</div>
-                    ) : (
-                      <div style={styles.impactList}>
-                        {impact.callees.map((c, i) => (
-                          <div key={i} style={styles.impactListItem}>
-                            <span style={styles.impactCalleeName}>{c.callee}</span>
-                            <span style={styles.impactLocation}>{c.file}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                        {/* Callees (Fan-out) */}
+                        <div style={styles.impactColumn}>
+                          <h4 style={styles.columnHeading}>
+                            Callees (Fan-Out: {callees.length})
+                          </h4>
+                          {callees.length === 0 ? (
+                            <div style={styles.emptyListNotice}>Leaf function (no downstream calls)</div>
+                          ) : (
+                            <div style={styles.impactList}>
+                              {callees.map((c, i) => (
+                                <div key={i} style={styles.impactListItem}>
+                                  <span style={styles.impactCalleeName}>{c.callee}</span>
+                                  <span style={styles.impactLocation}>{c.file}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )
+                  })()}
                 </div>
               </section>
             )}

@@ -98,15 +98,16 @@ export const SafetyScoreCard: React.FC<SafetyScoreCardProps> = ({
       </div>
 
       {/* Breaking Changes (T-18) */}
-      {safetyData.breakingChanges.length > 0 && (
+      {(safetyData.breakingChanges || []).length > 0 && (
         <div style={styles.section}>
           <h5 style={styles.sectionTitle}>
-            Breaking Changes Detected ({safetyData.breakingChanges.length})
+            Breaking Changes Detected ({(safetyData.breakingChanges || []).length})
           </h5>
           <div style={styles.bcList}>
-            {safetyData.breakingChanges.map((bc, idx) => {
+            {(safetyData.breakingChanges || []).map((bc, idx) => {
               const impactColor =
                 bc.impact === 'HIGH' ? '#dc2626' : bc.impact === 'MEDIUM' ? '#d97706' : '#2563eb'
+              const callers = bc.affectedCallers || []
               return (
                 <div key={idx} style={styles.bcItem} data-testid={`breaking-change-${idx}`}>
                   <div style={styles.bcHeader}>
@@ -121,10 +122,10 @@ export const SafetyScoreCard: React.FC<SafetyScoreCardProps> = ({
                     <span style={styles.bcEntity}>{bc.entity}</span>
                   </div>
                   <p style={styles.bcReason}>{bc.reason}</p>
-                  {bc.affectedCallers.length > 0 && (
+                  {callers.length > 0 && (
                     <div style={styles.callersRow}>
                       <span style={styles.callersLabel}>Impacted callers:</span>
-                      {bc.affectedCallers.map((c, i) => (
+                      {callers.map((c, i) => (
                         <code key={i} style={styles.callerCode}>
                           {c}
                         </code>
@@ -139,11 +140,11 @@ export const SafetyScoreCard: React.FC<SafetyScoreCardProps> = ({
       )}
 
       {/* Recommendations */}
-      {safetyData.recommendations.length > 0 && (
+      {(safetyData.recommendations || []).length > 0 && (
         <div style={styles.section}>
           <h5 style={styles.sectionTitle}>Safety Recommendations</h5>
           <ul style={styles.recList}>
-            {safetyData.recommendations.map((rec, i) => (
+            {(safetyData.recommendations || []).map((rec, i) => (
               <li key={i} style={styles.recItem}>
                 <span style={styles.recBullet}>✓</span>
                 {rec}

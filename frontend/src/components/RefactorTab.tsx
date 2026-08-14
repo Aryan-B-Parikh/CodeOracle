@@ -101,10 +101,10 @@ export const RefactorTab: React.FC<RefactorTabProps> = ({
               aria-label="Select entity for refactor"
             >
               <option value="">Choose an entity…</option>
-              {entities.map((e) => (
+              {(entities || []).map((e) => (
                 <option key={e.id} value={e.id}>
-                  {e.name} ({e.file.split('/').pop()}: L{e.lineStart}–L{e.lineEnd}) · CCN {e.complexity}
-                  {e.complexity >= 10 ? ' [HIGH RISK]' : ''}
+                  {e.name} ({(e.file || '').split('/').pop()}: L{e.lineStart}–L{e.lineEnd}) · CCN {e.complexity}
+                  {(e.complexity || 0) >= 10 ? ' [HIGH RISK]' : ''}
                 </option>
               ))}
             </select>
@@ -238,96 +238,108 @@ export const RefactorTab: React.FC<RefactorTabProps> = ({
           <SafetyScoreCard safetyData={safetyData} loading={loading} />
 
           {/* Breaking Changes Section */}
-          {proposal.breakingChanges && proposal.breakingChanges.detected && (
-            <div style={styles.breakingChangesSection}>
-              <h4 style={styles.breakingChangesTitle}>
-                <span style={styles.breakingChangesIcon}>⚠</span>
-                Potential Breaking Changes Detected ({proposal.breakingChanges.changes.length})
-              </h4>
-              <p style={styles.breakingChangesSubtitle}>
-                Review callers and dependencies that may be affected by signature changes:
-              </p>
-              <div style={styles.changesList}>
-                {proposal.breakingChanges.changes.map((ch, idx) => (
-                  <div key={idx} style={styles.changeItem}>
-                    <div style={styles.changeHeader}>
-                      <span
-                        style={{
-                          ...styles.impactBadge,
-                          ...(ch.impact === 'HIGH'
-                            ? styles.impactHigh
-                            : ch.impact === 'MEDIUM'
-                            ? styles.impactMedium
-                            : styles.impactLow),
-                        }}
-                      >
-                        {ch.impact} IMPACT
-                      </span>
-                      <span style={styles.changeEntity}>{ch.entity}</span>
-                    </div>
-                    <p style={styles.changeReason}>{ch.reason}</p>
-                    {ch.affectedCallers.length > 0 && (
-                      <div style={styles.callersBox}>
-                        <span style={styles.callersLabel}>Affected Callers:</span>
-                        <div style={styles.callersList}>
-                          {ch.affectedCallers.map((c, i) => (
-                            <span key={i} style={styles.callerLink}>{c}</span>
-                          ))}
+          {proposal.breakingChanges && proposal.breakingChanges.detected && (() => {
+            const changes = proposal.breakingChanges.changes || []
+            return (
+              <div style={styles.breakingChangesSection}>
+                <h4 style={styles.breakingChangesTitle}>
+                  <span style={styles.breakingChangesIcon}>⚠</span>
+                  Potential Breaking Changes Detected ({changes.length})
+                </h4>
+                <p style={styles.breakingChangesSubtitle}>
+                  Review callers and dependencies that may be affected by signature changes:
+                </p>
+                <div style={styles.changesList}>
+                  {changes.map((ch, idx) => {
+                    const callers = ch.affectedCallers || []
+                    return (
+                      <div key={idx} style={styles.changeItem}>
+                        <div style={styles.changeHeader}>
+                          <span
+                            style={{
+                              ...styles.impactBadge,
+                              ...(ch.impact === 'HIGH'
+                                ? styles.impactHigh
+                                : ch.impact === 'MEDIUM'
+                                ? styles.impactMedium
+                                : styles.impactLow),
+                            }}
+                          >
+                            {ch.impact} IMPACT
+                          </span>
+                          <span style={styles.changeEntity}>{ch.entity}</span>
                         </div>
+                        <p style={styles.changeReason}>{ch.reason}</p>
+                        {callers.length > 0 && (
+                          <div style={styles.callersBox}>
+                            <span style={styles.callersLabel}>Affected Callers:</span>
+                            <div style={styles.callersList}>
+                              {callers.map((c, i) => (
+                                <span key={i} style={styles.callerLink}>{c}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                ))}
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
 
           {/* Diff view */}
           <div style={styles.section}>
             <h4 style={styles.sectionTitle}>Side-by-Side Code Diff</h4>
             <DiffViewer
-              original={proposal.original}
-              proposed={proposal.proposed}
-              entityName={proposal.entityName}
+              original={proposal.original || ''}
+              proposed={proposal.proposed || ''}
+              entityName={proposal.entityName || 'Entity'}
             />
           </div>
 
           {/* WHY list */}
-          <div style={styles.twoCol}>
-            <div style={styles.panel}>
-              <h4 style={styles.sectionTitle}>Why This Refactor (Rationale)</h4>
-              {proposal.rationale.length === 0 ? (
-                <p style={styles.emptyText}>No rationale provided.</p>
-              ) : (
-                <ul style={styles.whyList}>
-                  {proposal.rationale.map((r, i) => (
-                    <li key={i} style={styles.whyItem} data-testid={`rationale-${i}`}>
-                      <span style={styles.whyBullet}>→</span>
-                      {r}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <div style={styles.panel}>
-              <h4 style={styles.sectionTitle}>Behavioral Differences</h4>
-              {proposal.behavioralDifferences.length === 0 ? (
-                <div style={styles.noChangesBox}>
-                  ✓ No behavioral differences — refactor preserves observable semantics.
+          {(() => {
+            const rationale = proposal.rationale || []
+            const behavioralDifferences = proposal.behavioralDifferences || []
+            return (
+              <div style={styles.twoCol}>
+                <div style={styles.panel}>
+                  <h4 style={styles.sectionTitle}>Why This Refactor (Rationale)</h4>
+                  {rationale.length === 0 ? (
+                    <p style={styles.emptyText}>No rationale provided.</p>
+                  ) : (
+                    <ul style={styles.whyList}>
+                      {rationale.map((r, i) => (
+                        <li key={i} style={styles.whyItem} data-testid={`rationale-${i}`}>
+                          <span style={styles.whyBullet}>→</span>
+                          {r}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-              ) : (
-                <ul style={styles.whyList}>
-                  {proposal.behavioralDifferences.map((d, i) => (
-                    <li key={i} style={styles.whyItem}>
-                      <span style={{ ...styles.whyBullet, color: '#f59e0b' }}>⚠</span>
-                      {d}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
+
+                <div style={styles.panel}>
+                  <h4 style={styles.sectionTitle}>Behavioral Differences</h4>
+                  {behavioralDifferences.length === 0 ? (
+                    <div style={styles.noChangesBox}>
+                      ✓ No behavioral differences — refactor preserves observable semantics.
+                    </div>
+                  ) : (
+                    <ul style={styles.whyList}>
+                      {behavioralDifferences.map((d, i) => (
+                        <li key={i} style={styles.whyItem}>
+                          <span style={{ ...styles.whyBullet, color: '#f59e0b' }}>⚠</span>
+                          {d}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
         </div>
       )}
     </div>

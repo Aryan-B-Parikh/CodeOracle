@@ -88,65 +88,78 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         </button>
       </div>
 
-      {summaryData && (
+      {summaryData && (() => {
+        const layers = summaryData.layers || []
+        const architecturalIssues = summaryData.architecturalIssues || []
+        const highRiskEntities = summaryData.highRiskEntities || []
+
+        return (
         <>
           {/* Architecture Pattern Banner */}
           <div style={styles.patternBox} data-testid="arch-pattern">
             <span style={styles.patternLabel}>Inferred Architecture Pattern:</span>
-            <span style={styles.patternVal}>{summaryData.architecturePattern}</span>
+            <span style={styles.patternVal}>{summaryData.architecturePattern || 'Modular / Layered'}</span>
           </div>
 
           {/* Architectural Layers */}
           <div style={styles.section}>
             <h4 style={styles.sectionTitle}>Architectural Layers</h4>
             <div style={styles.layersGrid}>
-              {summaryData.layers.map((layer, idx) => (
-                <div key={idx} style={styles.layerCard} data-testid={`layer-${idx}`}>
-                  <div style={styles.layerHeader}>
-                    <span style={styles.layerName}>{layer.name}</span>
-                    <span style={styles.layerCount}>{layer.fileCount} files</span>
-                  </div>
-                  <p style={styles.layerModules}>
-                    Modules: {layer.modules.slice(0, 5).join(', ')}
-                    {layer.modules.length > 5 ? '…' : ''}
-                  </p>
-                </div>
-              ))}
+              {layers.length === 0 ? (
+                <div style={styles.noIssuesBox}>Layers are being organized from discovered modules...</div>
+              ) : (
+                layers.map((layer, idx) => {
+                  const modules = layer.modules || []
+                  return (
+                    <div key={idx} style={styles.layerCard} data-testid={`layer-${idx}`}>
+                      <div style={styles.layerHeader}>
+                        <span style={styles.layerName}>{layer.name}</span>
+                        <span style={styles.layerCount}>{layer.fileCount || 0} files</span>
+                      </div>
+                      <p style={styles.layerModules}>
+                        Modules: {modules.slice(0, 5).join(', ')}
+                        {modules.length > 5 ? '…' : ''}
+                      </p>
+                    </div>
+                  )
+                })
+              )}
             </div>
           </div>
 
           {/* Architectural Issues & Warnings */}
           <div style={styles.section}>
             <h4 style={styles.sectionTitle}>
-              Architectural Issues &amp; Warnings ({summaryData.architecturalIssues.length})
+              Architectural Issues &amp; Warnings ({architecturalIssues.length})
             </h4>
-            {summaryData.architecturalIssues.length === 0 ? (
+            {architecturalIssues.length === 0 ? (
               <div style={styles.noIssuesBox}>
                 ✓ No high-risk architectural issues detected in this repository.
               </div>
             ) : (
               <div style={styles.issuesList}>
-                {summaryData.architecturalIssues.map((issue, idx) => {
+                {architecturalIssues.map((issue, idx) => {
                   const badgeColor =
                     issue.severity === 'high'
                       ? '#dc2626'
                       : issue.severity === 'medium'
                       ? '#d97706'
                       : '#2563eb'
+                  const affected = issue.affectedItems || []
 
                   return (
                     <div key={idx} style={styles.issueItem} data-testid={`issue-${idx}`}>
                       <div style={styles.issueHeader}>
                         <span style={{ ...styles.sevBadge, backgroundColor: badgeColor }}>
-                          {issue.severity.toUpperCase()}
+                          {(issue.severity || 'info').toUpperCase()}
                         </span>
                         <span style={styles.issueType}>{issue.type}</span>
                       </div>
                       <p style={styles.issueDesc}>{issue.description}</p>
-                      {issue.affectedItems.length > 0 && (
+                      {affected.length > 0 && (
                         <div style={styles.affectedRow}>
                           <span style={styles.affectedLabel}>Affected:</span>
-                          {issue.affectedItems.map((item, i) => (
+                          {affected.map((item, i) => (
                             <code key={i} style={styles.itemCode}>
                               {item}
                             </code>
@@ -161,9 +174,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           </div>
 
           {/* High-Risk Entities */}
-          {summaryData.highRiskEntities.length > 0 && (
+          {highRiskEntities.length > 0 && (
             <div style={styles.section}>
-              <h4 style={styles.sectionTitle}>High-Risk Code Entities</h4>
+              <h4 style={styles.sectionTitle}>High-Risk Code Entities ({highRiskEntities.length})</h4>
               <div style={styles.tableCard}>
                 <table style={styles.table}>
                   <thead>
@@ -176,22 +189,26 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {summaryData.highRiskEntities.map((entity, idx) => (
-                      <tr key={idx} style={styles.tr}>
-                        <td style={styles.tdBold}>{entity.name}</td>
-                        <td style={styles.tdCode}>{entity.filePath}</td>
-                        <td style={styles.tdCenter}>{entity.complexity}</td>
-                        <td style={styles.tdCenter}>{entity.fanIn}</td>
-                        <td style={styles.tdMuted}>{entity.riskReasons.join(', ')}</td>
-                      </tr>
-                    ))}
+                    {highRiskEntities.map((entity, idx) => {
+                      const reasons = entity.riskReasons || []
+                      return (
+                        <tr key={idx} style={styles.tr}>
+                          <td style={styles.tdBold}>{entity.name}</td>
+                          <td style={styles.tdCode}>{entity.filePath}</td>
+                          <td style={styles.tdCenter}>{entity.complexity}</td>
+                          <td style={styles.tdCenter}>{entity.fanIn}</td>
+                          <td style={styles.tdMuted}>{reasons.join(', ')}</td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
             </div>
           )}
         </>
-      )}
+        )
+      })()}
     </div>
   )
 }

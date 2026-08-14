@@ -587,42 +587,51 @@ export function DependencyGraphTab({
               </div>
 
               {/* Callers (Fan-in) */}
-              <div style={styles.drawerSection}>
-                <h4 style={styles.drawerSectionTitle}>
-                  Direct Callers ({selectedNode.callers.length})
-                </h4>
-                {selectedNode.callers.length === 0 ? (
-                  <p style={styles.emptyListNotice}>No direct callers found in graph.</p>
-                ) : (
-                  <div style={styles.drawerList}>
-                    {selectedNode.callers.map((c, i) => (
-                      <div key={i} style={styles.drawerListItem}>
-                        <span style={styles.callerIcon}>➔</span>
-                        <span>{c}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {/* Callers (Fan-in) */}
+              {(() => {
+                const callers = selectedNode.callers || []
+                const callees = selectedNode.callees || []
+                return (
+                  <>
+                    <div style={styles.drawerSection}>
+                      <h4 style={styles.drawerSectionTitle}>
+                        Direct Callers ({callers.length})
+                      </h4>
+                      {callers.length === 0 ? (
+                        <p style={styles.emptyListNotice}>No direct callers found in graph.</p>
+                      ) : (
+                        <div style={styles.drawerList}>
+                          {callers.map((c, i) => (
+                            <div key={i} style={styles.drawerListItem}>
+                              <span style={styles.callerIcon}>➔</span>
+                              <span>{c}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
 
-              {/* Callees (Fan-out) */}
-              <div style={styles.drawerSection}>
-                <h4 style={styles.drawerSectionTitle}>
-                  Direct Dependencies ({selectedNode.callees.length})
-                </h4>
-                {selectedNode.callees.length === 0 ? (
-                  <p style={styles.emptyListNotice}>No outgoing dependencies.</p>
-                ) : (
-                  <div style={styles.drawerList}>
-                    {selectedNode.callees.map((c, i) => (
-                      <div key={i} style={styles.drawerListItem}>
-                        <span style={styles.calleeIcon}>➔</span>
-                        <span>{c}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                    {/* Callees (Fan-out) */}
+                    <div style={styles.drawerSection}>
+                      <h4 style={styles.drawerSectionTitle}>
+                        Direct Dependencies ({callees.length})
+                      </h4>
+                      {callees.length === 0 ? (
+                        <p style={styles.emptyListNotice}>No outgoing dependencies.</p>
+                      ) : (
+                        <div style={styles.drawerList}>
+                          {callees.map((c, i) => (
+                            <div key={i} style={styles.drawerListItem}>
+                              <span style={styles.calleeIcon}>➔</span>
+                              <span>{c}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )
+              })()}
             </div>
           ) : (
             <div style={styles.noSelectionText}>Click a node in the graph to inspect details.</div>
