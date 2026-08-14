@@ -8,6 +8,8 @@ export interface RepositorySummary {
   id: string
   name: string
   status: string
+  sourceType?: string
+  githubUrl?: string | null
   loc: number
   entityCount: number
   languages: Record<string, boolean>
@@ -23,6 +25,28 @@ export async function fetchRepositories(): Promise<RepositoryListEnvelope> {
     throw new Error(`Failed to list repositories: status ${res.status}`)
   }
   return res.json()
+}
+
+export async function importRepository(githubUrl: string): Promise<RepositorySummary> {
+  const res = await fetch(`${API_BASE}/repositories/import`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ github_url: githubUrl }),
+  })
+  if (!res.ok) {
+    throw new Error(`Import failed: status ${res.status}`)
+  }
+  const envelope = await res.json()
+  return envelope.data as RepositorySummary
+}
+
+export async function triggerAnalysis(repositoryId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/repositories/${repositoryId}/analyze`, {
+    method: 'POST',
+  })
+  if (!res.ok && res.status !== 409) {
+    throw new Error(`Failed to start analysis: status ${res.status}`)
+  }
 }
 
 export async function uploadRepository(file: File): Promise<RepositorySummary> {

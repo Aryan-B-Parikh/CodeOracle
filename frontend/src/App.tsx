@@ -17,6 +17,8 @@ import {
   proposeRefactor,
   fetchSafetyScore,
   uploadRepository,
+  importRepository,
+  triggerAnalysis,
 } from './services/api'
 
 type TabKey = 'overview' | 'architecture' | 'explanations' | 'impact' | 'tests' | 'refactor'
@@ -34,6 +36,8 @@ export function App() {
   const [pipelineStatus, setPipelineStatus] = useState<RepositoryStatusData | null>(null)
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [sourceMode, setSourceMode] = useState<'zip' | 'github'>('zip')
+  const [githubUrl, setGithubUrl] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -87,6 +91,7 @@ export function App() {
           repo,
           ...prev.filter((r) => r.id !== repo.id),
         ])
+        await startAnalysis(repo.id)
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -94,6 +99,66 @@ export function App() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleImport = async () => {
+    const url = githubUrl.trim()
+    if (!url) {
+      setErrorMessage('Enter a GitHub repository URL to import.')
+      return
+    }
+    setLoading(true)
+    setErrorMessage(null)
+    try {
+      const repo = await importRepository(url)
+      if (repo?.id) {
+        setRepositoryId(repo.id)
+        setRepositories((prev) => [
+          repo,
+          ...prev.filter((r) => r.id !== repo.id),
+        ])
+        setGithubUrl('')
+        await startAnalysis(repo.id)
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setErrorMessage(`Import failed: ${msg}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const startAnalysis = async (id: string) => {
+    try {
+      await triggerAnalysis(id)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setErrorMessage(`Analysis trigger failed: ${msg}`)
+      return
+    }
+    let attempts = 0
+    const poll = setInterval(() => {
+      attempts += 1
+      if (attempts > 90) {
+        clearInterval(poll)
+        return
+      }
+      fetchRepositoryStatus(id)
+        .then((statusEnv) => {
+          if (statusEnv?.data) setPipelineStatus(statusEnv.data)
+        })
+        .catch(() => {})
+      fetchRepositories()
+        .then((envelope) => {
+          const updated = envelope.data ?? []
+          setRepositories(updated)
+          const current = updated.find((r) => r.id === id)
+          if (current && (current.status === 'analyzed' || current.status === 'failed')) {
+            clearInterval(poll)
+          }
+        })
+        .catch(() => {})
+    }, 2000)
   }
 
   const handleGenerateUncovered = async () => {
@@ -164,26 +229,81 @@ export function App() {
             <option value="">Select repository…</option>
             {repositories.map((repo) => (
               <option key={repo.id} value={repo.id}>
-                {repo.name} ({repo.status})
+                {repo.name} ({repo.status}
+                {repo.sourceType === 'github' ? ' · github' : ''})
               </option>
             ))}
           </select>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".zip"
-            style={{ display: 'none' }}
-            onChange={(e) => handleUpload(e.target.files?.[0] ?? null)}
-            data-testid="upload-input"
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={loading}
-            style={styles.uploadButton}
-            data-testid="upload-btn"
-          >
-            {loading ? 'Uploading…' : 'Upload ZIP'}
-          </button>
+
+          <div style={styles.sourceToggle} role="tablist" aria-label="Repository source type">
+            <button
+              onClick={() => setSourceMode('zip')}
+              style={{
+                ...styles.toggleButton,
+                backgroundColor: sourceMode === 'zip' ? '#0284c7' : '#0f172a',
+              }}
+              data-testid="source-zip"
+            >
+              ZIP file
+            </button>
+            <button
+              onClick={() => setSourceMode('github')}
+              style={{
+                ...styles.toggleButton,
+                backgroundColor: sourceMode === 'github' ? '#0284c7' : '#0f172a',
+              }}
+              data-testid="source-github"
+            >
+              GitHub URL
+            </button>
+          </div>
+
+          {sourceMode === 'github' ? (
+            <div style={styles.githubForm}>
+              <input
+                type="url"
+                placeholder="https://github.com/owner/repo"
+                value={githubUrl}
+                onChange={(e) => setGithubUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    handleImport()
+                  }
+                }}
+                style={styles.urlInput}
+                aria-label="GitHub repository URL"
+                data-testid="github-url-input"
+              />
+              <button
+                onClick={handleImport}
+                disabled={loading || !githubUrl.trim()}
+                style={styles.uploadButton}
+                data-testid="import-btn"
+              >
+                {loading ? 'Importing…' : 'Import'}
+              </button>
+            </div>
+          ) : (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".zip"
+                style={{ display: 'none' }}
+                onChange={(e) => handleUpload(e.target.files?.[0] ?? null)}
+                data-testid="upload-input"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={loading}
+                style={styles.uploadButton}
+                data-testid="upload-btn"
+              >
+                {loading ? 'Uploading…' : 'Upload ZIP'}
+              </button>
+            </>
+          )}
         </div>
 
         <nav style={styles.navTabs}>
@@ -315,6 +435,32 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '4px',
   },
   repoControls: { display: 'flex', alignItems: 'center', gap: '10px' },
+  sourceToggle: {
+    display: 'flex',
+    gap: '4px',
+    backgroundColor: '#0f172a',
+    borderRadius: '6px',
+    padding: '3px',
+  },
+  toggleButton: {
+    color: '#f8fafc',
+    border: 'none',
+    borderRadius: '4px',
+    padding: '5px 10px',
+    fontSize: '12px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+  githubForm: { display: 'flex', alignItems: 'center', gap: '8px' },
+  urlInput: {
+    backgroundColor: '#0f172a',
+    color: '#f8fafc',
+    border: '1px solid #334155',
+    borderRadius: '6px',
+    padding: '6px 12px',
+    fontSize: '13px',
+    width: '280px',
+  },
   repoSelect: {
     backgroundColor: '#0f172a',
     color: '#f8fafc',

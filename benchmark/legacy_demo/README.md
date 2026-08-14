@@ -29,6 +29,19 @@ legacy_demo/
 Both halves share the same domain (expenses, budgets, reports) so one demo
 narrative works for either language.
 
+## Ready-made upload zips
+
+For manual testing, pre-built zips live next to this README:
+
+```
+legacy_demo/
+├── legacy_demo_python.zip   # python/ (expense package + seed suite)
+└── legacy_demo_java.zip     # java/expenses Maven project
+```
+
+Upload either zip in the UI (or `POST /api/v1/repositories/upload`) without
+having to zip anything yourself.
+
 ## How to run the benchmark
 
 1. Upload `benchmark/legacy_demo/python` (or `.../java`) via ZIP or import.
