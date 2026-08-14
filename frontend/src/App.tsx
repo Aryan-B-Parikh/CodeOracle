@@ -40,6 +40,9 @@ const TABS: TabConfig[] = [
   { key: 'refactor', label: 'Refactor & Safety', icon: '⚡' },
 ]
 
+const POLL_INTERVAL_MS = 750
+const MAX_POLL_DURATION_MS = 6 * 60 * 1000
+
 export function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
   const [repositoryId, setRepositoryId] = useState<string | null>(null)
@@ -56,7 +59,15 @@ export function App() {
   const [githubUrl, setGithubUrl] = useState('')
   const [selectedEntityForRefactor, setSelectedEntityForRefactor] = useState<string | undefined>()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const activeRepositoryRef = useRef<string | null>(null)
+
+  const stopLivePolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearTimeout(pollingRef.current)
+      pollingRef.current = null
+    }
+  }, [])
 
   const loadRepositoryData = useCallback(async (id: string) => {
     try {
@@ -65,6 +76,7 @@ export function App() {
         fetchRepositorySummary(id).catch(() => null),
         fetchRepositoryStatus(id).catch(() => null),
       ])
+      if (activeRepositoryRef.current !== id) return
       if (testEnv?.data) setTestRunData(testEnv.data)
       if (sumEnv?.data) setSummaryData(sumEnv.data)
       if (statusEnv?.data) setPipelineStatus(statusEnv.data)
@@ -74,20 +86,21 @@ export function App() {
   }, [])
 
   const startLivePolling = useCallback((id: string) => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current)
-    }
+    stopLivePolling()
+    activeRepositoryRef.current = id
+    const startedAt = Date.now()
 
-    let attempts = 0
-    pollingRef.current = setInterval(async () => {
-      attempts += 1
-      if (attempts > 120) {
-        if (pollingRef.current) clearInterval(pollingRef.current)
+    const poll = async () => {
+      if (activeRepositoryRef.current !== id) return
+      if (Date.now() - startedAt >= MAX_POLL_DURATION_MS) {
+        pollingRef.current = null
+        setErrorMessage('Analysis is taking longer than expected. You can continue working; refresh status to check progress.')
         return
       }
 
       try {
         const statusEnv = await fetchRepositoryStatus(id)
+        if (activeRepositoryRef.current !== id) return
         if (statusEnv?.data) {
           setPipelineStatus(statusEnv.data)
           const isDone =
@@ -95,44 +108,62 @@ export function App() {
             statusEnv.data.analysisStatus === 'failed' ||
             statusEnv.data.currentStage === 'completed'
           if (isDone) {
-            if (pollingRef.current) clearInterval(pollingRef.current)
+            pollingRef.current = null
             await loadRepositoryData(id)
+            if (activeRepositoryRef.current !== id) return
             const repoList = await fetchRepositories()
-            setRepositories(repoList.data ?? [])
+            if (activeRepositoryRef.current === id) {
+              setRepositories(repoList.data ?? [])
+            }
+            return
           }
         }
       } catch {
-        // Retry next tick
+        // Retry next tick while the selected repository remains active.
       }
-    }, 750)
-  }, [loadRepositoryData])
+
+      if (activeRepositoryRef.current === id) {
+        pollingRef.current = setTimeout(poll, POLL_INTERVAL_MS)
+      }
+    }
+
+    void poll()
+  }, [loadRepositoryData, stopLivePolling])
 
   useEffect(() => {
     fetchRepositories()
       .then((envelope) => {
         const repos = envelope.data ?? []
         setRepositories(repos)
-        if (repos.length > 0 && !repositoryId) {
+        if (repos.length > 0 && !activeRepositoryRef.current) {
+          activeRepositoryRef.current = repos[0].id
           setRepositoryId(repos[0].id)
         }
       })
       .catch((err) => console.error('Failed to load repositories:', err))
 
     return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current)
+      stopLivePolling()
+      activeRepositoryRef.current = null
     }
-  }, [])
+  }, [stopLivePolling])
 
   useEffect(() => {
     if (!repositoryId) return
-    loadRepositoryData(repositoryId)
+    activeRepositoryRef.current = repositoryId
+    void loadRepositoryData(repositoryId)
   }, [repositoryId, loadRepositoryData])
 
   const selectRepository = (id: string) => {
+    stopLivePolling()
+    activeRepositoryRef.current = id || null
     setRepositoryId(id || null)
     setTestRunData(null)
+    setSummaryData(null)
+    setPipelineStatus(null)
     setRefactorProposal(null)
     setSafetyData(null)
+    setSelectedEntityForRefactor(undefined)
     setErrorMessage(null)
     setSuccessMessage(null)
   }
@@ -145,9 +176,12 @@ export function App() {
     try {
       const repo = await uploadRepository(file)
       if (repo?.id) {
+        activeRepositoryRef.current = repo.id
         setRepositoryId(repo.id)
         setRepositories((prev) => [repo, ...prev.filter((r) => r.id !== repo.id)])
-        setSuccessMessage(`Repository '${repo.name}' uploaded! Live analysis started.`)
+        setSuccessMessage(`Repository '${repo.name}' uploaded!`)
+        await triggerAnalysis(repo.id)
+        setSuccessMessage(`Repository '${repo.name}' uploaded. Live analysis started.`)
         startLivePolling(repo.id)
       }
     } catch (err: unknown) {
@@ -170,10 +204,12 @@ export function App() {
     try {
       const repo = await importRepository(url)
       if (repo?.id) {
+        activeRepositoryRef.current = repo.id
         setRepositoryId(repo.id)
         setRepositories((prev) => [repo, ...prev.filter((r) => r.id !== repo.id)])
         setGithubUrl('')
-        setSuccessMessage(`Repository '${repo.name}' imported from GitHub! Live analysis started.`)
+        await triggerAnalysis(repo.id)
+        setSuccessMessage(`Repository '${repo.name}' imported from GitHub. Live analysis started.`)
         startLivePolling(repo.id)
       }
     } catch (err: unknown) {
@@ -185,13 +221,14 @@ export function App() {
   }
 
   const handleTriggerAnalysis = async () => {
-    if (!repositoryId) return
+    const id = repositoryId
+    if (!id) return
     setLoading(true)
     setErrorMessage(null)
     try {
-      await triggerAnalysis(repositoryId)
+      await triggerAnalysis(id)
       setSuccessMessage('Analysis pipeline queued!')
-      startLivePolling(repositoryId)
+      startLivePolling(id)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       setErrorMessage(`Failed to trigger analysis: ${msg}`)
@@ -201,7 +238,8 @@ export function App() {
   }
 
   const handleGenerateUncovered = async () => {
-    if (!repositoryId) {
+    const id = repositoryId
+    if (!id) {
       setErrorMessage('Select or upload a repository before generating tests.')
       return
     }
@@ -209,32 +247,35 @@ export function App() {
     setLoading(true)
     setErrorMessage(null)
     try {
-      const envelope = await triggerGenerateUncovered(repositoryId, 3, 60.0)
+      const envelope = await triggerGenerateUncovered(id, 3, 60.0)
+      if (activeRepositoryRef.current !== id) return
       if (envelope.data) {
         setTestRunData(envelope.data)
         setSuccessMessage('Coverage repair cycle completed!')
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
-      setErrorMessage(`Coverage repair failed: ${msg}`)
+      if (activeRepositoryRef.current === id) setErrorMessage(`Coverage repair failed: ${msg}`)
     } finally {
-      setLoading(false)
+      if (activeRepositoryRef.current === id) setLoading(false)
     }
   }
 
   const handleProposeRefactor = async (entityId: string) => {
-    if (!repositoryId) return
+    const id = repositoryId
+    if (!id) return
     setLoading(true)
     setErrorMessage(null)
     setRefactorProposal(null)
     setSafetyData(null)
     try {
-      const envelope = await proposeRefactor(repositoryId, entityId)
+      const envelope = await proposeRefactor(id, entityId)
+      if (activeRepositoryRef.current !== id) return
       if (envelope.data) {
         setRefactorProposal(envelope.data)
         try {
-          const safetyEnv = await fetchSafetyScore(repositoryId, envelope.data.proposalId)
-          if (safetyEnv.data) {
+          const safetyEnv = await fetchSafetyScore(id, envelope.data.proposalId)
+          if (activeRepositoryRef.current === id && safetyEnv.data) {
             setSafetyData(safetyEnv.data)
           }
         } catch {
@@ -245,16 +286,16 @@ export function App() {
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
-      setErrorMessage(`Refactor proposal failed: ${msg}`)
+      if (activeRepositoryRef.current === id) setErrorMessage(`Refactor proposal failed: ${msg}`)
     } finally {
-      setLoading(false)
+      if (activeRepositoryRef.current === id) setLoading(false)
     }
   }
 
   const navigateToRefactor = (entityId: string) => {
     setSelectedEntityForRefactor(entityId)
     setActiveTab('refactor')
-    handleProposeRefactor(entityId)
+    void handleProposeRefactor(entityId)
   }
 
   const navigateToExplanation = () => {
@@ -263,7 +304,6 @@ export function App() {
 
   return (
     <div style={styles.appContainer}>
-      {/* Top Header Bar */}
       <header style={styles.header}>
         <div style={styles.headerLeft}>
           <div style={styles.brandRow}>
@@ -271,7 +311,6 @@ export function App() {
             <span style={styles.logoText}>CodeOracle</span>
             <span style={styles.versionBadge}>10/10 Modernization</span>
           </div>
-
           <div style={styles.repoPickerContainer}>
             <select
               value={repositoryId ?? ''}
@@ -289,7 +328,6 @@ export function App() {
           </div>
         </div>
 
-        {/* Source Ingestion Controls */}
         <div style={styles.headerRight}>
           <div style={styles.sourceToggle} role="tablist" aria-label="Ingestion method">
             <button
@@ -326,7 +364,7 @@ export function App() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault()
-                    handleImport()
+                    void handleImport()
                   }
                 }}
                 style={styles.urlInput}
@@ -334,7 +372,7 @@ export function App() {
                 data-testid="github-url-input"
               />
               <button
-                onClick={handleImport}
+                onClick={() => void handleImport()}
                 disabled={loading || !githubUrl.trim()}
                 style={styles.uploadButton}
                 data-testid="import-btn"
@@ -349,7 +387,7 @@ export function App() {
                 type="file"
                 accept=".zip"
                 style={{ display: 'none' }}
-                onChange={(e) => handleUpload(e.target.files?.[0] ?? null)}
+                onChange={(e) => void handleUpload(e.target.files?.[0] ?? null)}
                 data-testid="upload-input"
               />
               <button
@@ -365,7 +403,7 @@ export function App() {
 
           {repositoryId && (
             <button
-              onClick={handleTriggerAnalysis}
+              onClick={() => void handleTriggerAnalysis()}
               disabled={loading || pipelineStatus?.analysisStatus === 'running'}
               style={styles.reanalyzeBtn}
               title="Re-run AST facts, Graph & Semantic Index pipeline"
@@ -376,7 +414,6 @@ export function App() {
         </div>
       </header>
 
-      {/* Workspace Navigation Bar */}
       <nav style={styles.navBar} aria-label="Main Navigation">
         <div style={styles.navTabsContainer}>
           {TABS.map((tab) => {
@@ -402,18 +439,11 @@ export function App() {
         </div>
       </nav>
 
-      {/* Notifications & Alert Banners */}
       {errorMessage && (
         <div style={styles.errorBanner} role="alert">
           <span style={styles.alertIcon}>✕</span>
           <span style={{ flex: 1 }}>{errorMessage}</span>
-          <button
-            onClick={() => setErrorMessage(null)}
-            style={styles.closeBtn}
-            aria-label="Dismiss error"
-          >
-            ×
-          </button>
+          <button onClick={() => setErrorMessage(null)} style={styles.closeBtn} aria-label="Dismiss error">×</button>
         </div>
       )}
 
@@ -421,19 +451,11 @@ export function App() {
         <div style={styles.successBanner} role="status">
           <span style={styles.alertIcon}>✓</span>
           <span style={{ flex: 1 }}>{successMessage}</span>
-          <button
-            onClick={() => setSuccessMessage(null)}
-            style={styles.closeBtn}
-            aria-label="Dismiss message"
-          >
-            ×
-          </button>
+          <button onClick={() => setSuccessMessage(null)} style={styles.closeBtn} aria-label="Dismiss message">×</button>
         </div>
       )}
 
-      {/* Main Workspace Body */}
       <main style={styles.mainContent}>
-        {/* Live Pipeline Status Banner */}
         {pipelineStatus && pipelineStatus.analysisStatus === 'running' && (
           <div style={styles.pipelineLiveContainer}>
             <PipelineStatusCard
@@ -444,7 +466,6 @@ export function App() {
           </div>
         )}
 
-        {/* Tab 1: Overview & Architecture */}
         {activeTab === 'overview' && (
           <div style={styles.tabContentContainer}>
             {pipelineStatus && pipelineStatus.analysisStatus !== 'running' && (
@@ -461,18 +482,13 @@ export function App() {
               loading={loading}
               onDownloadReport={
                 repositoryId
-                  ? () =>
-                      downloadExecutiveReport(
-                        repositoryId,
-                        repositories.find((r) => r.id === repositoryId)?.name
-                      )
+                  ? () => downloadExecutiveReport(repositoryId, repositories.find((r) => r.id === repositoryId)?.name)
                   : undefined
               }
             />
           </div>
         )}
 
-        {/* Tab 2: Grounded Explanations */}
         {activeTab === 'explanations' && (
           <div style={styles.tabContentContainer}>
             <ExplanationTab
@@ -483,7 +499,6 @@ export function App() {
           </div>
         )}
 
-        {/* Tab 3: Interactive Dependency Graph */}
         {activeTab === 'graph' && (
           <div style={styles.tabContentContainer}>
             <DependencyGraphTab
@@ -495,19 +510,17 @@ export function App() {
           </div>
         )}
 
-        {/* Tab 4: Generated Tests Lab */}
         {activeTab === 'tests' && (
           <div style={styles.tabContentContainer}>
             <TestsTab
               repositoryId={repositoryId || undefined}
               testRunData={testRunData}
               loading={loading}
-              onGenerateUncovered={repositoryId ? handleGenerateUncovered : undefined}
+              onGenerateUncovered={repositoryId ? () => void handleGenerateUncovered() : undefined}
             />
           </div>
         )}
 
-        {/* Tab 5: Refactor & Safety Workspace */}
         {activeTab === 'refactor' && (
           <div style={styles.tabContentContainer}>
             <RefactorTab
